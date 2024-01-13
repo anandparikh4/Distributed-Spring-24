@@ -1,63 +1,221 @@
+import random
+from fifolock import FifoLock
 from flask import Flask, request, jsonify
-from threading import Lock
+from utils import Read, Write, random_hostname
 
 app = Flask(__name__)
 app.debug = True
-lock = Lock()
+lock = FifoLock()
 
-# List to store numbers.
-numbers = [] # replace with consistent hash map
+
+# List to store web server replica hostnames
+# TODO: Replace with consistent hash data structure
+replicas: list[str] = []
+
+
+@app.route('/rep', methods=['GET'])
+async def rep():
+    """
+    Return the number and list of replica hostnames.
+
+    Response payload:
+        message:
+            N: number of replicas
+            replicas: list of replica hostnames
+        status: status of the request
+    """
+
+    async with lock(Read):
+        # Return the response payload
+        return jsonify({
+            'message': {
+                'N': len(replicas),
+                'replicas': replicas,
+            },
+            'status': 'successful',
+        }), 200
+    # END async with lock
+# END rep
 
 
 @app.route('/add', methods=['POST'])
 async def add():
     """
-    Add a number to the list.
+    Add new server replica hostname(s) to the list.
 
-    The number is provided as a 'number' field in a JSON object in the request body.
-    If the number is successfully added, return a success status and the updated list.
-    If no number is provided, return a failure status and an error message.
+    If `len(hostnames) <= n`:
+        Add `hostnames` and `n - len(hostnames)` random hostnames to the list.
+    If `n <= 0`:
+        Return an error message.
+    If `len(hostnames) > n`:
+        Return an error message.
+
+    Random hostnames are generated using the `random_hostname()` function.
+
+    `Request payload:`
+        `n: number of servers to add`
+        `hostnames: list of server replica hostnames to add (<= n) [optional]`
+
+    `Response payload:`
+        `message:`
+            `N: number of replicas`
+            `replicas: list of replica hostnames`
+        `status: status of the request`
+
+    `Error payload:`
+        `message: error message`
+        `status: status of the request`
     """
-    data = request.get_json()
-    number = data.get('number')
-    if number is not None:
-        with lock:  # Acquire the lock
-            numbers.append(number)
-        return jsonify({'status': 'success', 'numbers': numbers}), 200
-    else:
-        return jsonify({'status': 'failure', 'error': 'No number provided'}), 400
-    # END if
+
+    # Get the request payload
+    payload: dict = request.get_json()
+    print(payload)
+
+    # Get the number of servers to add
+    n = int(payload.get('n', -1))
+
+    # Get the list of server replica hostnames to add
+    hostnames: list[str] = list(payload.get('hostnames', []))
+
+    if n <= 0:
+        return jsonify({
+            'message': '<Error> Number of servers to add must be greater than 0',
+            'status': 'failure'
+        }), 400
+
+    if len(hostnames) > n:
+        return jsonify({
+            'message': '<Error> Length of hostname list is more than new instances to add',
+            'status': 'failure'
+        }), 400
+
+    async with lock(Write):
+        # Add `hostnames` and `n - len(hostnames)` random hostnames to the list.
+        hostnames.extend([random_hostname()
+                         for _ in range(n - len(hostnames))])
+
+        # Add the hostnames to the list
+        for hostname in hostnames:
+            replicas.append(hostname)
+            # TODO: spawn new docker containers for the new hostnames
+        # END for
+    # END async with lock
+
+    # Return the response payload
+    return jsonify({
+        'message': {
+            'N': len(replicas),
+            'replicas': replicas
+        },
+        'status': 'success'
+    }), 200
 # END add
 
 
-@app.route('/delete', methods=['DELETE'])
+@app.route('/rm', methods=['DELETE'])
 async def delete():
     """
-    Delete the last number from the list.
+    Delete server replica hostname(s) from the list.
 
-    If the list is not empty, remove the last number and return a success status and the deleted number.
-    If the list is empty, return a failure status and an error message.
+    If `len(hostnames) <= n`:
+        Delete `hostnames` and `n - len(hostnames)` random hostnames from the list.
+    If `n <= 0`:
+        Return an error message.
+    If `n > len(replicas)`:
+        Return an error message.
+    If `len(hostnames) > n`:
+        Return an error message.
+    If for any hostname in `hostnames`, `hostname not in replicas`:
+        Do not delete any replicas from the list.
+        Return an error message.
+
+    Random hostnames are deleted from the list.
+
+    `Request payload:`
+        `n: number of servers to delete`
+        `hostnames: list of server replica hostnames to delete (<= n) [optional]`
+
+    `Response payload:`
+        `message:`
+            `N: number of replicas`
+            `replicas: list of replica hostnames`
+        `status: status of the request`
+
+    `Error payload:`
+        `message: error message`
+        `status: status of the request`
     """
-    with lock:  # Acquire the lock
-        if numbers:
-            deleted_number = numbers.pop()
-            return jsonify({'status': 'success', 'deleted_number': deleted_number}), 200
-        else:
-            return jsonify({'status': 'failure', 'error': 'No numbers to delete'}), 400
-        # END if
-    # END with lock
+
+    # Get the request payload
+    payload: dict = request.get_json()
+    print(payload)
+
+    # Get the number of servers to delete
+    n = int(payload.get('n', -1))
+
+    # Get the list of server replica hostnames to delete
+    hostnames: list[str] = list(payload.get('hostnames', []))
+
+    if n <= 0:
+        return jsonify({
+            'message': '<Error> Number of servers to delete must be greater than 0',
+            'status': 'failure'
+        }), 400
+
+    if n > len(replicas):
+        return jsonify({
+            'message': '<Error> Number of servers to delete must be less than or equal to number of replicas',
+            'status': 'failure'
+        }), 400
+
+    if len(hostnames) > n:
+        return jsonify({
+            'message': '<Error> Length of hostname list is more than instances to delete',
+            'status': 'failure'
+        }), 400
+
+    # return first hostname that is not in replicas
+    for hostname in hostnames:
+        if hostname not in replicas:
+            return jsonify({
+                'message': f'<Error> Hostname `{hostname}` is not in replicas',
+                'status': 'failure'
+            }), 400
+
+    async with lock(Write):
+        # Choose `n - len(hostnames)` random hostnames from the list without replacement
+        random_hostnames = random.sample(replicas, k=n - len(hostnames))
+
+        # Add the random hostnames to the list of hostnames to delete
+        hostnames.extend(random_hostnames)
+
+        # Delete the hostnames from the list
+        for hostname in hostnames:
+            replicas.remove(hostname)
+            # TODO: kill docker containers for the deleted hostnames
+    # END async with lock
+
+    # Return the response payload
+    return jsonify({
+        'message': {
+            'N': len(replicas),
+            'replicas': replicas
+        },
+        'status': 'success'
+    }), 200
 # END delete
 
 
-@app.route('/view', methods=['GET'])
-async def view():
+@app.route('/{path}', methods=['GET', 'POST', 'DELETE'])
+async def catch_all(path: str):
     """
-    View the current list of numbers.
-
-    Return a success status and the current list of numbers.
+    Catch all requests to the load balancer.
     """
-    return jsonify({'status': 'success', 'numbers': numbers}), 200
-# END view
+    return jsonify({
+        'message': f'<Error> Invalid endpoint: {path}',
+        'status': 'failure'
+    }), 400
+# END catch_all
 
 
 if __name__ == '__main__':

@@ -1,69 +1,132 @@
 import random
 import requests
-import asyncio
 
 # URL of the server
 url = 'http://127.0.0.1:8080'
+endpoints = ['add', 'rm', 'rep']
 
 
-async def add_request(number):
+def add_request(
+    n: int,
+    hostnames: list[str],
+):
     """
     Send a request to the add endpoint.
     """
-    payload = {'number': number}
-    add_response = requests.post(url + '/add', json=payload)
+    payload = {
+        'n': n,
+        'hostnames': hostnames,
+    }
 
-    return add_response.text
+    response = requests.post(url + '/add', json=payload)
+
+    return response.text
 # END add_request
 
 
-async def delete_request():
+def delete_request(
+    n: int,
+    hostnames: list[str],
+):
     """
     Send a request to the delete endpoint.
     """
-    delete_response = requests.delete(url + '/delete')
-    return delete_response.text
+
+    payload = {
+        'n': n,
+        'hostnames': hostnames,
+    }
+
+    response = requests.delete(url + '/rm', json=payload)
+
+    return response.text
 # END delete_request
 
 
-async def view_request():
+def view_request():
     """
     Send a request to the view endpoint.
     """
-    view_response = requests.get(url + '/view')
-    return view_response.text
+
+    response = requests.get(url + '/rep')
+
+    return response.text
 # END view_request
 
 
-async def call_random_endpoint():
-    """
-    Generate a random number and use it to select and call an endpoint.
-    If the add endpoint is chosen, generate a new random number to send to the server.
-    """
-    endpoint_number = random.randint(1, 2)
+def parse_command(cmd: str):
+    parts = cmd.split()
+    parts = [part.strip() for part in parts]
 
-    if endpoint_number == 1:
-        number = random.randint(1, 100)
-        response = await add_request(number)
-        print(f'Called add endpoint with number {number}.'
-              f' Response: {response}')
-    elif endpoint_number == 2:
-        response = await delete_request()
-        print(f'Called delete endpoint. Response: {response}')
-    # END if
+    if not parts:
+        raise ValueError("No command provided")
 
-    response = await view_request()
-    print(f'Called view endpoint. Response: {response}')
-# END call_random_endpoint
+    command = parts[0].upper()
+    if command == 'ADD':
+        parts.append("")
+        if len(parts) < 2:
+            raise ValueError("Not enough arguments for ADD command")
+        number = int(parts[1])
+        items = parts[2:]
+        items.pop()
 
+        return ('ADD', number, items)
 
-async def main():
+    elif command == 'DEL':
+        parts.append("")
+        if len(parts) < 2:
+            raise ValueError("Not enough arguments for DEL command")
+        number = int(parts[1])
+        items = parts[2:]
+        items.pop()
+
+        return ('DEL', number, items)
+
+    elif command == 'REP':
+        if len(parts) > 1:
+            raise ValueError("REP command does not take any arguments")
+        return ('REP',)
+
+    else:
+        return tuple(parts)
+# END parse_command
+
+def other_request(
+    endpoint: str,
+    ):
     """
-    Call a random endpoint 10 times.
+    Send a request to the other endpoint.
     """
-    for _ in range(100):
-        await call_random_endpoint()
+    
+    response = requests.get(f'{url}/{endpoint}')
+    
+    return response.text
+# END other_request
+
+
+def call_endpoint(endpoint: str, *args):
+    if endpoint == 'ADD':
+        return add_request(*args)
+    elif endpoint == 'DEL':
+        return delete_request(*args)
+    elif endpoint == 'REP':
+        return view_request()
+    else:
+        return other_request(endpoint)
+        
+# END call_endpoint
+
+
+def main():
+    while True:
+        cmd = input("Enter command: ")
+        try:
+            endpoint, *args = parse_command(cmd)
+            print(call_endpoint(endpoint, *args))
+        except ValueError as e:
+            print(e)
 # END main
 
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
