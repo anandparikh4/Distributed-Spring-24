@@ -54,3 +54,7 @@ class ConsistentHashMap:
         while self.slots[request_hash] is None:
             request_hash = (request_hash+1) % self.n_slots
         return self.slots[request_hash]
+
+    # get list of all hostnames of servers
+    def getServerList(self):
+        return list(self.servers.keys())
