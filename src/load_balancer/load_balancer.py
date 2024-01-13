@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
+from threading import Lock
 
 app = Flask(__name__)
 app.debug = True
+lock = Lock()
 
 # List to store numbers.
-numbers = []
+numbers = [] # replace with consistent hash map
 
 
 @app.route('/add', methods=['POST'])
-def add():
+async def add():
     """
     Add a number to the list.
 
@@ -19,7 +21,8 @@ def add():
     data = request.get_json()
     number = data.get('number')
     if number is not None:
-        numbers.append(number)
+        with lock:  # Acquire the lock
+            numbers.append(number)
         return jsonify({'status': 'success', 'numbers': numbers}), 200
     else:
         return jsonify({'status': 'failure', 'error': 'No number provided'}), 400
@@ -28,24 +31,26 @@ def add():
 
 
 @app.route('/delete', methods=['DELETE'])
-def delete():
+async def delete():
     """
     Delete the last number from the list.
 
     If the list is not empty, remove the last number and return a success status and the deleted number.
     If the list is empty, return a failure status and an error message.
     """
-    if numbers:
-        deleted_number = numbers.pop()
-        return jsonify({'status': 'success', 'deleted_number': deleted_number}), 200
-    else:
-        return jsonify({'status': 'failure', 'error': 'No numbers to delete'}), 400
-    # END if
+    with lock:  # Acquire the lock
+        if numbers:
+            deleted_number = numbers.pop()
+            return jsonify({'status': 'success', 'deleted_number': deleted_number}), 200
+        else:
+            return jsonify({'status': 'failure', 'error': 'No numbers to delete'}), 400
+        # END if
+    # END with lock
 # END delete
 
 
 @app.route('/view', methods=['GET'])
-def view():
+async def view():
     """
     View the current list of numbers.
 
