@@ -13,3 +13,6 @@ def home():
 @app.route('/heartbeat', methods=['GET'])
 def heartbeat():
     return Response(status=200)
+
+if __name__ == '__main__':
+    app.run(port=8080)
