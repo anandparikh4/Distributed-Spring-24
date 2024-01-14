@@ -4,7 +4,7 @@ from flask import Flask, Response, jsonify
 app = Flask(__name__)
 
 @app.route('/home', methods=['GET'])
-def home():
+async def home():
     """
     Greet a client with its server ID.
 
@@ -18,7 +18,7 @@ def home():
     }), 200
 
 @app.route('/heartbeat', methods=['GET'])
-def heartbeat():
+async def heartbeat():
     """
     Send heartbeat response upon request.
 
