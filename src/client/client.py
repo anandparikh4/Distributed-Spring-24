@@ -31,7 +31,7 @@ def add_request(
 
     response = requests.post(url + '/add', json=payload)
 
-    return response.text
+    return f'Response: {response.text}Code: {response.status_code}'
 # END add_request
 
 
@@ -50,7 +50,7 @@ def delete_request(
 
     response = requests.delete(url + '/rm', json=payload)
 
-    return response.text
+    return f'Response: {response.text}Code: {response.status_code}'
 # END delete_request
 
 
@@ -61,7 +61,7 @@ def view_request():
 
     response = requests.get(url + '/rep')
 
-    return response.text
+    return f'Response: {response.text}Code: {response.status_code}'
 # END view_request
 
 
@@ -119,7 +119,7 @@ def other_request(
 
     response = requests.get(f'{url}/{endpoint}', json=payload)
 
-    return response.text
+    return f'Response: {response.text}Code: {response.status_code}'
 # END other_request
 
 
