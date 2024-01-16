@@ -6,14 +6,14 @@ from icecream import ic
 from hash import ConsistentHashMap
 
 app = Flask(__name__)
-app.debug = True
 lock = FifoLock()
 
+# ic.disable()
 
 # List to store web server replica hostnames
 # TODO: Replace with consistent hash data structure
 # replicas: list[str] = []
-replicas= ConsistentHashMap()
+replicas = ConsistentHashMap()
 
 
 @app.route('/rep', methods=['GET'])
@@ -119,7 +119,7 @@ async def add():
         # END for
     # END async with lock
 
-    # ic(replicas)
+    ic(replicas.getServerList())
 
     # Return the response payload
     return jsonify({
@@ -224,7 +224,7 @@ async def delete():
             # TODO: kill docker containers for the deleted hostnames
     # END async with lock
 
-    # ic(replicas)
+    ic(replicas.getServerList())
 
     # Return the response payload
     return jsonify({
@@ -243,22 +243,18 @@ async def catch_all():
     Catch all requests to the load balancer.
     """
 
-    payload = request.get_json()
-    request_id = payload.get("request_id")
+    payload: dict = request.get_json()
+    ic(payload)
+    request_id = int(payload.get("request_id", -1))
 
     server_name = replicas.find(request_id)
 
     return jsonify({
-        'message': f'Sending to server {server_name}',
+        'message': f'Sending to server: {server_name}',
         'status': 'successful'
     }), 200
-
-    # return jsonify({
-    #     'message': f'<Error> Invalid endpoint: {path}',
-    #     'status': 'failure'
-    # }), 400
 # END catch_all
 
 
 if __name__ == '__main__':
-    app.run(port=8080)
+    app.run(debug=True)

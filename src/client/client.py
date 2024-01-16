@@ -1,9 +1,20 @@
+import sys
+import signal
 import random
 import requests
 
 # URL of the server
-url = 'http://127.0.0.1:8080'
+url = 'http://127.0.0.1:5000'
 endpoints = ['add', 'rm', 'rep']
+
+
+# clean exit on ctrl-c
+def signal_handler(sig, frame):
+    print('Exiting...')
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def add_request(
@@ -91,21 +102,23 @@ def parse_command(cmd: str):
         return tuple(parts)
 # END parse_command
 
+
 def other_request(
     endpoint: str,
-    ):
+):
     """
     Send a request to the other endpoint.
     """
 
-    request_id = random.randint(100000,999999)
+    request_id = random.randint(100000, 999999)
     print(request_id)
+
     payload = {
         'request_id': request_id
     }
-    
-    response = requests.get(f'{url}/find',json=payload)
-    
+
+    response = requests.get(f'{url}/{endpoint}', json=payload)
+
     return response.text
 # END other_request
 
@@ -119,7 +132,7 @@ def call_endpoint(endpoint: str, *args):
         return view_request()
     else:
         return other_request(endpoint)
-        
+
 # END call_endpoint
 
 
