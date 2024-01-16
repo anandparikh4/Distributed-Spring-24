@@ -22,3 +22,14 @@ def random_hostname():
 
     return f'Server-{random.randint(0, 10000):04}-{int(time.time()*1e3)}'
 # END random_hostname
+
+
+def err_payload(err: Exception):
+    """
+    Generate an error payload.
+    """
+
+    return {
+        'message': f'<Error> {err}',
+        'status': 'failure'
+    }
