@@ -52,9 +52,12 @@ async def add():
         Return an error message.
     If `len(hostnames) > n`:
         Return an error message.
-    If hostnames contains duplicates:
+    If `hostnames` contains duplicates:
         Return an error message.
     If `n > remaining slots`:
+        Return an error message.
+    If `hostname` already exists in `replicas`:
+        Do not add any replicas to the list.
         Return an error message.
 
     Random hostnames are generated using the `random_hostname()` function.
@@ -109,6 +112,14 @@ async def add():
             if n > replicas.remaining():
                 raise Exception(
                     f'Insufficient slots. Only {replicas.remaining()} slots left')
+            
+            hostnames_set = set(hostnames)
+            replicas_set = set(replicas.getServerList())
+            
+            # Check if all `hostnames` are in `replicas`
+            if not hostnames_set.isdisjoint(replicas_set):
+                raise Exception(
+                    f'Hostnames `{hostnames_set & replicas_set}` are already in replicas')
 
             ic("To add:", hostnames)
 
@@ -195,20 +206,19 @@ async def delete():
                 'Length of hostname list is more than instances to delete')
 
         async with lock(Write):
-            choices = replicas.getServerList().copy()
+            choices = set(replicas.getServerList())
 
-            # return first hostname that is not in replicas
-            for hostname in hostnames:
-                if hostname not in choices:
-                    raise Exception(
-                        f'Hostname `{hostname}` is not in replicas')
-            # END for
+            # Convert hostnames to set for faster lookup
+            hostnames_set = set(hostnames)
 
-            # remove `hostnames` from `replicas`
-            for hostname in hostnames:
-                choices.remove(hostname)
-            # END for
+            # Check if all `hostnames` are in `replicas`
+            if not hostnames_set.issubset(choices):
+                raise Exception(
+                    f'Hostnames `{hostnames_set - choices}` are not in replicas')
 
+            # remove `hostnames` from `choices`
+            choices = list(choices - hostnames_set)
+            
             # Choose `n - len(hostnames)` random hostnames from the list without replacement
             random_hostnames = random.sample(choices, k=n - len(hostnames))
 
@@ -236,6 +246,7 @@ async def delete():
 
     except Exception as e:
         return jsonify(err_payload(e)), 400
+    # END try-except
 # END delete
 
 
