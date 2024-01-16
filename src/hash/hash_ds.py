@@ -28,7 +28,11 @@ class ConsistentHashMap:
             raise IndexError("Insufficient slots to add new server")
         if hostname in self.servers.keys:
             raise KeyError("Hostname already present")
-        server_idx = len(self.servers)
+        server_idx = 0
+        for value in sorted(list(self.servers.values())):
+            server_idx += 1
+            if server_idx != value:
+                break
         self.servers[hostname] = server_idx
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(server_idx+1, virtual_idx+1)) % self.n_slots
