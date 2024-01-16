@@ -1,7 +1,7 @@
 import random
 from fifolock import FifoLock
 from flask import Flask, request, jsonify
-from utils import Read, Write, random_hostname
+from utils import Read, Write, random_hostname, err_payload
 from icecream import ic
 from hash import ConsistentHashMap
 
@@ -52,6 +52,8 @@ async def add():
         Return an error message.
     If `len(hostnames) > n`:
         Return an error message.
+    If hostnames contains duplicates:
+        Return an error message.
     If `n > remaining slots`:
         Return an error message.
 
@@ -72,63 +74,66 @@ async def add():
         `status: status of the request`
     """
 
-    # Get the request payload
-    payload: dict = request.get_json()
-    ic(payload)
+    try:
+        # Get the request payload
+        payload: dict = request.get_json()
+        ic(payload)
 
-    # Get the number of servers to add
-    n = int(payload.get('n', -1))
+        # Get the number of servers to add
+        n = int(payload.get('n', -1))
 
-    # Get the list of server replica hostnames to add
-    hostnames: list[str] = list(payload.get('hostnames', []))
+        # Get the list of server replica hostnames to add
+        hostnames: list[str] = list(payload.get('hostnames', []))
 
-    if n <= 0:
-        return jsonify({
-            'message': '<Error> Number of servers to add must be greater than 0',
-            'status': 'failure'
-        }), 400
+        if n <= 0:
+            raise Exception(
+                '<Error> Number of servers to add must be greater than 0')
 
-    if len(hostnames) > n:
-        return jsonify({
-            'message': '<Error> Length of hostname list is more than new instances to add',
-            'status': 'failure'
-        }), 400
+        if len(hostnames) > n:
+            raise Exception(
+                '<Error> Length of hostname list is more than instances to add')
 
-    if n > replicas.remaining():
-        return jsonify({
-            'message': f'<Error> Insufficient slots. Only {replicas.remaining()} slots left',
-            'status': 'failure'
-        }), 400
+        if len(hostnames) != len(set(hostnames)):
+            raise Exception('<Error> Hostname list contains duplicates')
 
-    # Generate `n - len(hostnames)` random hostnames
-    new_hostnames = set()
-    while len(new_hostnames) < n - len(hostnames):
-        new_hostnames.add(random_hostname())
+        # Generate `n - len(hostnames)` random hostnames
+        new_hostnames: set[str] = set()
+        while len(new_hostnames) < n - len(hostnames):
+            new_hostnames.add(random_hostname())
 
-    async with lock(Write):
-        # Add `new_hostnames` random hostnames to the list.
+        # Add `new_hostnames` to the list.
         hostnames.extend(new_hostnames)
 
-        ic("To add:", hostnames)
+        async with lock(Write):
+            # Check is slots are available
+            if n > replicas.remaining():
+                raise Exception(
+                    f'<Error> Insufficient slots. Only {replicas.remaining()} slots left')
 
-        # Add the hostnames to the list
-        for hostname in hostnames:
-            # replicas.append(hostname)
-            replicas.add(hostname)
-            # TODO: spawn new docker containers for the new hostnames
-        # END for
-    # END async with lock
+            ic("To add:", hostnames)
 
-    ic(replicas.getServerList())
+            # Add the hostnames to the list
+            for hostname in hostnames:
+                # replicas.append(hostname)
+                replicas.add(hostname)
+                # TODO: spawn new docker containers for the new hostnames
+            # END for
+        # END async with lock
 
-    # Return the response payload
-    return jsonify({
-        'message': {
-            'N': len(replicas),
-            'replicas': replicas.getServerList()
-        },
-        'status': 'success'
-    }), 200
+        ic(replicas.getServerList())
+
+        # Return the response payload
+        return jsonify({
+            'message': {
+                'N': len(replicas),
+                'replicas': replicas.getServerList()
+            },
+            'status': 'success'
+        }), 200
+
+    except Exception as e:
+        return jsonify(err_payload(e)), 400
+    # END try-except
 # END add
 
 
@@ -166,74 +171,71 @@ async def delete():
         `status: status of the request`
     """
 
-    # Get the request payload
-    payload: dict = request.get_json()
-    ic(payload)
+    try:
+        # Get the request payload
+        payload: dict = request.get_json()
+        ic(payload)
 
-    # Get the number of servers to delete
-    n = int(payload.get('n', -1))
+        # Get the number of servers to delete
+        n = int(payload.get('n', -1))
 
-    # Get the list of server replica hostnames to delete
-    hostnames: list[str] = list(payload.get('hostnames', []))
+        # Get the list of server replica hostnames to delete
+        hostnames: list[str] = list(payload.get('hostnames', []))
 
-    if n <= 0:
+        if n <= 0:
+            raise Exception(
+                '<Error> Number of servers to delete must be greater than 0')
+
+        if n > len(replicas):
+            raise Exception(
+                '<Error> Number of servers to delete must be less than or equal to number of replicas')
+
+        if len(hostnames) > n:
+            raise Exception(
+                '<Error> Length of hostname list is more than instances to delete')
+
+        async with lock(Write):
+            choices = replicas.getServerList().copy()
+
+            # return first hostname that is not in replicas
+            for hostname in hostnames:
+                if hostname not in choices:
+                    raise Exception(
+                        f'<Error> Hostname `{hostname}` is not in replicas')
+            # END for
+
+            # remove `hostnames` from `replicas`
+            for hostname in hostnames:
+                choices.remove(hostname)
+            # END for
+
+            # Choose `n - len(hostnames)` random hostnames from the list without replacement
+            random_hostnames = random.sample(choices, k=n - len(hostnames))
+
+            # Add the random hostnames to the list of hostnames to delete
+            hostnames.extend(random_hostnames)
+
+            ic("To delete:", hostnames)
+
+            # Delete the hostnames from the list
+            for hostname in hostnames:
+                replicas.remove(hostname)
+                # TODO: kill docker containers for the deleted hostnames
+        # END async with lock
+
+        ic(replicas.getServerList())
+
+        # Return the response payload
         return jsonify({
-            'message': '<Error> Number of servers to delete must be greater than 0',
-            'status': 'failure'
-        }), 400
+            'message': {
+                'N': len(replicas),
+                'replicas': replicas.getServerList()
+            },
+            'status': 'success'
+        }), 200
 
-    if n > len(replicas):
-        return jsonify({
-            'message': '<Error> Number of servers to delete must be less than or equal to number of replicas',
-            'status': 'failure'
-        }), 400
-
-    if len(hostnames) > n:
-        return jsonify({
-            'message': '<Error> Length of hostname list is more than instances to delete',
-            'status': 'failure'
-        }), 400
-
-    # return first hostname that is not in replicas
-    for hostname in hostnames:
-        if hostname not in replicas.getServerList():
-            return jsonify({
-                'message': f'<Error> Hostname `{hostname}` is not in replicas',
-                'status': 'failure'
-            }), 400
-    # END for
-
-    # remove `hostnames` from `replicas`
-    choices = replicas.getServerList().copy()
-    for hostname in hostnames:
-        choices.remove(hostname)
-    # END for
-
-    async with lock(Write):
-        # Choose `n - len(hostnames)` random hostnames from the list without replacement
-        random_hostnames = random.sample(choices, k=n - len(hostnames))
-
-        # Add the random hostnames to the list of hostnames to delete
-        hostnames.extend(random_hostnames)
-
-        ic("To delete:", hostnames)
-
-        # Delete the hostnames from the list
-        for hostname in hostnames:
-            replicas.remove(hostname)
-            # TODO: kill docker containers for the deleted hostnames
-    # END async with lock
-
-    ic(replicas.getServerList())
-
-    # Return the response payload
-    return jsonify({
-        'message': {
-            'N': len(replicas),
-            'replicas': replicas.getServerList()
-        },
-        'status': 'success'
-    }), 200
+    except Exception as e:
+        return jsonify(err_payload(e)), 400
 # END delete
 
 
@@ -243,16 +245,24 @@ async def catch_all():
     Catch all requests to the load balancer.
     """
 
-    payload: dict = request.get_json()
-    ic(payload)
-    request_id = int(payload.get("request_id", -1))
+    try:
+        payload: dict = request.get_json()
+        ic(payload)
+        request_id = int(payload.get("request_id", -1))
 
-    server_name = replicas.find(request_id)
+        server_name = replicas.find(request_id)
 
-    return jsonify({
-        'message': f'Sending to server: {server_name}',
-        'status': 'successful'
-    }), 200
+        if server_name is None:
+            raise Exception('<Error> No servers are available')
+
+        return jsonify({
+            'message': f'Sending to server: {server_name}',
+            'status': 'successful'
+        }), 200
+
+    except Exception as e:
+        return jsonify(err_payload(e)), 400
+    # END try-except
 # END catch_all
 
 
