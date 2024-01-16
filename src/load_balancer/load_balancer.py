@@ -90,10 +90,16 @@ async def add():
             'status': 'failure'
         }), 400
 
+    # Generate `n - len(hostnames)` random hostnames
+    new_hostnames = set()
+    while len(new_hostnames) < n - len(hostnames):
+        new_hostnames.add(random_hostname())
+
     async with lock(Write):
-        # Add `hostnames` and `n - len(hostnames)` random hostnames to the list.
-        hostnames.extend([random_hostname()
-                         for _ in range(n - len(hostnames))])
+        # Add `new_hostnames` random hostnames to the list.
+        hostnames.extend(new_hostnames)
+
+        ic("To add:", hostnames)
 
         # Add the hostnames to the list
         for hostname in hostnames:
@@ -132,7 +138,7 @@ async def delete():
         Do not delete any replicas from the list.
         Return an error message.
 
-    Random hostnames are deleted from the list.
+    Random hostnames are deleted from the list of replicas.
 
     `Request payload:`
         `n: number of servers to delete`
@@ -184,19 +190,30 @@ async def delete():
                 'message': f'<Error> Hostname `{hostname}` is not in replicas',
                 'status': 'failure'
             }), 400
+    # END for
+
+    # remove `hostnames` from `replicas`
+    choices = replicas.copy()
+    for hostname in hostnames:
+        choices.remove(hostname)
+    # END for
 
     async with lock(Write):
         # Choose `n - len(hostnames)` random hostnames from the list without replacement
-        random_hostnames = random.sample(replicas, k=n - len(hostnames))
+        random_hostnames = random.sample(choices, k=n - len(hostnames))
 
         # Add the random hostnames to the list of hostnames to delete
         hostnames.extend(random_hostnames)
+
+        ic("To delete:", hostnames)
 
         # Delete the hostnames from the list
         for hostname in hostnames:
             replicas.remove(hostname)
             # TODO: kill docker containers for the deleted hostnames
     # END async with lock
+
+    ic(replicas)
 
     # Return the response payload
     return jsonify({
