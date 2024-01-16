@@ -87,14 +87,14 @@ async def add():
 
         if n <= 0:
             raise Exception(
-                '<Error> Number of servers to add must be greater than 0')
+                'Number of servers to add must be greater than 0')
 
         if len(hostnames) > n:
             raise Exception(
-                '<Error> Length of hostname list is more than instances to add')
+                'Length of hostname list is more than instances to add')
 
         if len(hostnames) != len(set(hostnames)):
-            raise Exception('<Error> Hostname list contains duplicates')
+            raise Exception('Hostname list contains duplicates')
 
         # Generate `n - len(hostnames)` random hostnames
         new_hostnames: set[str] = set()
@@ -108,7 +108,7 @@ async def add():
             # Check is slots are available
             if n > replicas.remaining():
                 raise Exception(
-                    f'<Error> Insufficient slots. Only {replicas.remaining()} slots left')
+                    f'Insufficient slots. Only {replicas.remaining()} slots left')
 
             ic("To add:", hostnames)
 
@@ -184,15 +184,15 @@ async def delete():
 
         if n <= 0:
             raise Exception(
-                '<Error> Number of servers to delete must be greater than 0')
+                'Number of servers to delete must be greater than 0')
 
         if n > len(replicas):
             raise Exception(
-                '<Error> Number of servers to delete must be less than or equal to number of replicas')
+                'Number of servers to delete must be less than or equal to number of replicas')
 
         if len(hostnames) > n:
             raise Exception(
-                '<Error> Length of hostname list is more than instances to delete')
+                'Length of hostname list is more than instances to delete')
 
         async with lock(Write):
             choices = replicas.getServerList().copy()
@@ -201,7 +201,7 @@ async def delete():
             for hostname in hostnames:
                 if hostname not in choices:
                     raise Exception(
-                        f'<Error> Hostname `{hostname}` is not in replicas')
+                        f'Hostname `{hostname}` is not in replicas')
             # END for
 
             # remove `hostnames` from `replicas`
@@ -253,7 +253,7 @@ async def catch_all():
         server_name = replicas.find(request_id)
 
         if server_name is None:
-            raise Exception('<Error> No servers are available')
+            raise Exception('No servers are available')
 
         return jsonify({
             'message': f'Sending to server: {server_name}',
