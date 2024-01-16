@@ -8,9 +8,13 @@ class ConsistentHashMap:
         self.n_slots = n_slots
         self.n_virtual = n_virtual
         if hostnames is None:
-            hostnames = ["Server 1", "Server 2", "Server 3"]
+            hostnames = ["Server-1", "Server-2", "Server-3"]
         for hostname in hostnames:
             self.add(hostname)
+
+    # length
+    def __len__(self):
+        return len(self.servers)
 
     # hash function for request
     @staticmethod
@@ -26,7 +30,7 @@ class ConsistentHashMap:
     def add(self, hostname):
         if self.slots.count(None) < self.n_virtual:
             raise IndexError("Insufficient slots to add new server")
-        if hostname in self.servers.keys:
+        if hostname in self.servers.keys():
             raise KeyError("Hostname already present")
         server_idx = 0
         for value in sorted(list(self.servers.values())):
@@ -42,7 +46,7 @@ class ConsistentHashMap:
 
     # remove a server (by hostname)
     def remove(self, hostname):
-        if hostname not in self.servers.keys:
+        if hostname not in self.servers.keys():
             raise KeyError("Hostname not found")
         server_idx = self.servers[hostname]
         self.servers.pop(hostname)
@@ -62,3 +66,7 @@ class ConsistentHashMap:
     # get list of all hostnames of servers
     def getServerList(self):
         return list(self.servers.keys())
+
+    # get remaining servers
+    def remaining(self):
+        return self.slots.count(None) // self.n_virtual

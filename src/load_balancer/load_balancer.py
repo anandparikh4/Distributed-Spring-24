@@ -3,6 +3,7 @@ from fifolock import FifoLock
 from flask import Flask, request, jsonify
 from utils import Read, Write, random_hostname
 from icecream import ic
+from hash import ConsistentHashMap
 
 app = Flask(__name__)
 app.debug = True
@@ -11,7 +12,8 @@ lock = FifoLock()
 
 # List to store web server replica hostnames
 # TODO: Replace with consistent hash data structure
-replicas: list[str] = []
+# replicas: list[str] = []
+replicas= ConsistentHashMap()
 
 
 @app.route('/rep', methods=['GET'])
@@ -31,7 +33,7 @@ async def rep():
         return jsonify({
             'message': {
                 'N': len(replicas),
-                'replicas': replicas,
+                'replicas': replicas.getServerList(),
             },
             'status': 'successful',
         }), 200
@@ -49,6 +51,8 @@ async def add():
     If `n <= 0`:
         Return an error message.
     If `len(hostnames) > n`:
+        Return an error message.
+    If `n > remaining slots`:
         Return an error message.
 
     Random hostnames are generated using the `random_hostname()` function.
@@ -90,6 +94,12 @@ async def add():
             'status': 'failure'
         }), 400
 
+    if n > replicas.remaining():
+        return jsonify({
+            'message': f'<Error> Insufficient slots. Only {replicas.remaining()} slots left',
+            'status': 'failure'
+        }), 400
+
     # Generate `n - len(hostnames)` random hostnames
     new_hostnames = set()
     while len(new_hostnames) < n - len(hostnames):
@@ -103,18 +113,19 @@ async def add():
 
         # Add the hostnames to the list
         for hostname in hostnames:
-            replicas.append(hostname)
+            # replicas.append(hostname)
+            replicas.add(hostname)
             # TODO: spawn new docker containers for the new hostnames
         # END for
     # END async with lock
 
-    ic(replicas)
+    # ic(replicas)
 
     # Return the response payload
     return jsonify({
         'message': {
             'N': len(replicas),
-            'replicas': replicas
+            'replicas': replicas.getServerList()
         },
         'status': 'success'
     }), 200
@@ -185,7 +196,7 @@ async def delete():
 
     # return first hostname that is not in replicas
     for hostname in hostnames:
-        if hostname not in replicas:
+        if hostname not in replicas.getServerList():
             return jsonify({
                 'message': f'<Error> Hostname `{hostname}` is not in replicas',
                 'status': 'failure'
@@ -193,7 +204,7 @@ async def delete():
     # END for
 
     # remove `hostnames` from `replicas`
-    choices = replicas.copy()
+    choices = replicas.getServerList().copy()
     for hostname in hostnames:
         choices.remove(hostname)
     # END for
@@ -213,13 +224,13 @@ async def delete():
             # TODO: kill docker containers for the deleted hostnames
     # END async with lock
 
-    ic(replicas)
+    # ic(replicas)
 
     # Return the response payload
     return jsonify({
         'message': {
             'N': len(replicas),
-            'replicas': replicas
+            'replicas': replicas.getServerList()
         },
         'status': 'success'
     }), 200
