@@ -1,3 +1,5 @@
+from icecream import ic
+
 # consistent hashing data structure
 class ConsistentHashMap:
 
@@ -61,6 +63,8 @@ class ConsistentHashMap:
         request_hash = (self.requestHash(request_id)) % self.n_slots
         while self.slots[request_hash] is None:
             request_hash = (request_hash+1) % self.n_slots
+        ic(self.slots)
+        print(request_hash)
         return self.slots[request_hash]
 
     # get list of all hostnames of servers

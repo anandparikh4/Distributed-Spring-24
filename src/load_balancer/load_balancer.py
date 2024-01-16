@@ -237,15 +237,26 @@ async def delete():
 # END delete
 
 
-@app.route('/{path}', methods=['GET', 'POST', 'DELETE'])
-async def catch_all(path: str):
+@app.route('/find', methods=['GET'])
+async def catch_all():
     """
     Catch all requests to the load balancer.
     """
+
+    payload = request.get_json()
+    request_id = payload.get("request_id")
+
+    server_name = replicas.find(request_id)
+
     return jsonify({
-        'message': f'<Error> Invalid endpoint: {path}',
-        'status': 'failure'
-    }), 400
+        'message': f'Sending to server {server_name}',
+        'status': 'successful'
+    }), 200
+
+    # return jsonify({
+    #     'message': f'<Error> Invalid endpoint: {path}',
+    #     'status': 'failure'
+    # }), 400
 # END catch_all
 
 
