@@ -2,6 +2,7 @@ import random
 from fifolock import FifoLock
 from flask import Flask, request, jsonify
 from utils import Read, Write, random_hostname
+from icecream import ic
 
 app = Flask(__name__)
 app.debug = True
@@ -69,7 +70,7 @@ async def add():
 
     # Get the request payload
     payload: dict = request.get_json()
-    print(payload)
+    ic(payload)
 
     # Get the number of servers to add
     n = int(payload.get('n', -1))
@@ -100,6 +101,8 @@ async def add():
             # TODO: spawn new docker containers for the new hostnames
         # END for
     # END async with lock
+
+    ic(replicas)
 
     # Return the response payload
     return jsonify({
@@ -148,7 +151,7 @@ async def delete():
 
     # Get the request payload
     payload: dict = request.get_json()
-    print(payload)
+    ic(payload)
 
     # Get the number of servers to delete
     n = int(payload.get('n', -1))
