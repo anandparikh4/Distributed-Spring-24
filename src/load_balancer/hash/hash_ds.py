@@ -1,13 +1,9 @@
-from icecream import ic
-
 # consistent hashing data structure
-
-
 class ConsistentHashMap:
 
     # constructor
     def __init__(self, hostnames=None, n_slots=512, n_virtual=9):
-        self.servers = {}
+        self.servers: dict[str, int] = {}
         self.slots: list[None | str] = [None] * n_slots
         self.n_slots = n_slots
         self.n_virtual = n_virtual
@@ -23,12 +19,12 @@ class ConsistentHashMap:
     # hash function for request
     @staticmethod
     def requestHash(i: int):
-        return i*i + 2*i + 17
+        return i * i + 2 * i + 17
 
     # hash function for server
     @staticmethod
     def serverHash(i: int, j: int):
-        return i*i + j*j + 2*j + 25
+        return i * i + j * j + 2 * j + 25
 
     # add a server (by hostname)
     def add(self, hostname: str):
@@ -44,9 +40,9 @@ class ConsistentHashMap:
         self.servers[hostname] = server_idx
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(
-                server_idx+1, virtual_idx+1)) % self.n_slots
+                server_idx + 1, virtual_idx + 1)) % self.n_slots
             while self.slots[server_hash] is not None:
-                server_hash = (server_hash+1) % self.n_slots
+                server_hash = (server_hash + 1) % self.n_slots
             self.slots[server_hash] = hostname
 
     # remove a server (by hostname)
@@ -57,16 +53,16 @@ class ConsistentHashMap:
         self.servers.pop(hostname)
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(
-                server_idx+1, virtual_idx+1)) % self.n_slots
+                server_idx + 1, virtual_idx + 1)) % self.n_slots
             while self.slots[server_hash] != hostname:
-                server_hash = (server_hash+1) % self.n_slots
+                server_hash = (server_hash + 1) % self.n_slots
             self.slots[server_hash] = None
 
     # find the server (by hostname) to which to route the request
-    def find(self, request_id: int) -> str:
+    def find(self, request_id: int):
         request_hash = (self.requestHash(request_id)) % self.n_slots
         while self.slots[request_hash] is None:
-            request_hash = (request_hash+1) % self.n_slots
+            request_hash = (request_hash + 1) % self.n_slots
         return self.slots[request_hash]
 
     # get list of all hostnames of servers
