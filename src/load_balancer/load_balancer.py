@@ -393,6 +393,7 @@ async def get_heartbeats():
         # END async with lock
 
         await asyncio.sleep(5)
+    # END while
 # END get_heartbeats
 
 
