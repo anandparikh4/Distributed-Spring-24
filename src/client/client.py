@@ -2,6 +2,7 @@ import sys
 import signal
 import random
 import requests
+# import grequests
 
 # URL of the server
 url = 'http://127.0.0.1:5000'
@@ -30,6 +31,8 @@ def add_request(
     }
 
     response = requests.post(url + '/add', json=payload)
+    # response = grequests.post(url + '/add', json=payload)
+    # response = grequests.map([response])[0]
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END add_request
@@ -132,6 +135,7 @@ def call_endpoint(endpoint: str, *args):
         return view_request()
     else:
         return other_request(endpoint)
+    
 
 # END call_endpoint
 
