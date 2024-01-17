@@ -1,21 +1,25 @@
+import asyncio
 import random
-# import requests
+import sys
 import grequests
 from fifolock import FifoLock
-from flask import Flask, request, jsonify
 from utils import Read, Write, random_hostname, err_payload
+from quart import Quart, request, jsonify
 from icecream import ic
 from hash import ConsistentHashMap
 
-app = Flask(__name__)
+app = Quart(__name__)
 lock = FifoLock()
 
 # ic.disable()
 
 # List to store web server replica hostnames
-# TODO: Replace with consistent hash data structure
-# replicas: list[str] = []
 replicas = ConsistentHashMap()
+
+
+# Map to store heartbeat fail counts for each server replica.
+heartbeat_fail_count: dict[str, int] = {}
+MAX_COUNT = 5
 
 
 @app.route('/rep', methods=['GET'])
@@ -29,6 +33,9 @@ async def rep():
             replicas: list of replica hostnames
         status: status of the request
     """
+
+    global replicas
+    global heartbeat_fail_count
 
     async with lock(Read):
         # Return the response payload
@@ -79,9 +86,12 @@ async def add():
         `status: status of the request`
     """
 
+    global replicas
+    global heartbeat_fail_count
+
     try:
         # Get the request payload
-        payload: dict = request.get_json()
+        payload: dict = await request.get_json()
         ic(payload)
 
         # Get the number of servers to add
@@ -127,8 +137,11 @@ async def add():
 
             # Add the hostnames to the list
             for hostname in hostnames:
-                # replicas.append(hostname)
                 replicas.add(hostname)
+
+                # Edit the flatline map
+                heartbeat_fail_count[hostname] = 0
+
                 # TODO: spawn new docker containers for the new hostnames
             # END for
         # END async with lock
@@ -184,9 +197,12 @@ async def delete():
         `status: status of the request`
     """
 
+    global replicas
+    global heartbeat_fail_count
+
     try:
         # Get the request payload
-        payload: dict = request.get_json()
+        payload: dict = await request.get_json()
         ic(payload)
 
         # Get the number of servers to delete
@@ -232,6 +248,10 @@ async def delete():
             # Delete the hostnames from the list
             for hostname in hostnames:
                 replicas.remove(hostname)
+
+                # Edit the flatline map
+                heartbeat_fail_count.pop(hostname, None)
+
                 # TODO: kill docker containers for the deleted hostnames
         # END async with lock
 
@@ -256,11 +276,25 @@ async def delete():
 async def home():
     """
     Load balance the request to the server replicas.
+
+    `Request payload:`
+        `request_id: id of the request`
+
+    `Response payload:`
+        `message: error message`
+        `status: status of the request`
+
+    `Error payload:`
+        `message: error message`
+        `status: status of the request`
     """
+
+    global replicas
+    global heartbeat_fail_count
 
     try:
         # Get the request payload
-        payload: dict = request.get_json()
+        payload: dict = await request.get_json()
         ic(payload)
         request_id = int(payload.get("request_id", -1))
 
@@ -270,8 +304,16 @@ async def home():
             raise Exception('No servers are available')
 
         # Send the request to the server asynchronously
+        # serv_response = requests.get(f'http://{server_name}:8080/home')
         serv_request = grequests.get('http://127.0.0.1:8080/home')
+        # async stuff happens here (I think lol)
         serv_response = grequests.map([serv_request])[0]
+
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        if serv_response is None:
+            raise Exception('Server did not respond')
 
         return jsonify(serv_response.json()), 200
 
@@ -281,5 +323,95 @@ async def home():
 # END home
 
 
+@app.route('/<path:path>')
+async def catch_all(path):
+    """
+    Catch all other routes and return an error message.
+    """
+
+    return jsonify({
+        'message': f'<Error> `/{path}` endpoint does not exist in server replicas',
+        'status': 'failure'
+    }), 400
+# END catch_all
+
+
+@app.before_serving
+async def my_startup():
+    """
+    Startup function to be run before the app starts.
+    """
+
+    # Register the heartbeat background task
+    app.add_background_task(get_heartbeats)
+
+    # To allow other tasks to run
+    await asyncio.sleep(0)
+# END my_startup
+
+
+async def get_heartbeats():
+    """
+    Calls the heartbeat endpoint of all the replicas.
+    If a replica does not respond, it is respawned.
+    """
+
+    global replicas
+    global heartbeat_fail_count
+
+    while True:
+        async with lock(Read):
+            # Get the list of server replica hostnames
+            hostnames = replicas.getServerList().copy()
+
+            port = 12345
+
+            heartbeats = [grequests.get(f'http://{server_name}:8080/heartbeat')
+                          for server_name in replicas.getServerList()]
+            # heartbeats = [grequests.get(f'http://127.0.0.1:{port + i}/heartbeat')
+            #               for i in range(len(hostnames))]  # TODO: change to server_name
+
+            for i, response in grequests.imap_enumerated(heartbeats):
+                if response is None:
+                    # Increment the fail count for the server replica
+                    heartbeat_fail_count[hostnames[i]] = \
+                        heartbeat_fail_count.get(hostnames[i], 0) + 1
+
+                    # If fail count exceeds the max count, respawn the server replica
+                    if heartbeat_fail_count[hostnames[i]] >= MAX_COUNT:
+                        handle_flatline(hostnames[i])
+                else:
+                    # Reset the fail count for the server replica
+                    heartbeat_fail_count[hostnames[i]] = 0
+                # END if-else
+
+                # To allow other tasks to run
+                await asyncio.sleep(0)
+            # END for
+
+            ic(heartbeat_fail_count)
+        # END async with lock
+
+        await asyncio.sleep(5)
+# END get_heartbeats
+
+
+def handle_flatline(server_name: str):
+    """
+    Handles the flatline of a server replica.
+    """
+
+    msg = f'Flatline of server replica `{server_name}` detected'
+    ic(msg)
+
+    # TODO: respawn the server replica using docker
+
+# END handle_flatline
+
+
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    # Take port number from argument if provided
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
+
+    # Run the server
+    app.run(port=port, debug=True, use_reloader=False)
