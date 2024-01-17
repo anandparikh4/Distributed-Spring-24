@@ -1,5 +1,6 @@
 import random
-import requests
+# import requests
+import grequests
 from fifolock import FifoLock
 from flask import Flask, request, jsonify
 from utils import Read, Write, random_hostname, err_payload
@@ -113,10 +114,10 @@ async def add():
             if n > replicas.remaining():
                 raise Exception(
                     f'Insufficient slots. Only {replicas.remaining()} slots left')
-            
+
             hostnames_set = set(hostnames)
             replicas_set = set(replicas.getServerList())
-            
+
             # Check if all `hostnames` are in `replicas`
             if not hostnames_set.isdisjoint(replicas_set):
                 raise Exception(
@@ -219,7 +220,7 @@ async def delete():
 
             # remove `hostnames` from `choices`
             choices = list(choices - hostnames_set)
-            
+
             # Choose `n - len(hostnames)` random hostnames from the list without replacement
             random_hostnames = random.sample(choices, k=n - len(hostnames))
 
@@ -254,10 +255,11 @@ async def delete():
 @app.route('/home', methods=['GET'])
 async def home():
     """
-    Catch all requests to the load balancer.
+    Load balance the request to the server replicas.
     """
 
     try:
+        # Get the request payload
         payload: dict = request.get_json()
         ic(payload)
         request_id = int(payload.get("request_id", -1))
@@ -267,14 +269,11 @@ async def home():
         if server_name is None:
             raise Exception('No servers are available')
 
-        response = requests.get(f'http://localhost:5000/home')        
+        # Send the request to the server asynchronously
+        serv_request = grequests.get('http://127.0.0.1:8080/home')
+        serv_response = grequests.map([serv_request])[0]
 
-        return jsonify(response.json()), 200
-
-        # return jsonify({
-        #     'message': f'Sending to server: {server_name}',
-        #     'status': 'successful'
-        # }), 200
+        return jsonify(serv_response.json()), 200
 
     except Exception as e:
         return jsonify(err_payload(e)), 400
@@ -283,4 +282,4 @@ async def home():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=5000, debug=True)
