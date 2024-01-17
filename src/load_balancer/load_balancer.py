@@ -1,4 +1,5 @@
 import random
+import requests
 from fifolock import FifoLock
 from flask import Flask, request, jsonify
 from utils import Read, Write, random_hostname, err_payload
@@ -250,8 +251,8 @@ async def delete():
 # END delete
 
 
-@app.route('/find', methods=['GET'])
-async def catch_all():
+@app.route('/home', methods=['GET'])
+async def home():
     """
     Catch all requests to the load balancer.
     """
@@ -266,15 +267,19 @@ async def catch_all():
         if server_name is None:
             raise Exception('No servers are available')
 
-        return jsonify({
-            'message': f'Sending to server: {server_name}',
-            'status': 'successful'
-        }), 200
+        response = requests.get(f'http://localhost:5000/home')        
+
+        return jsonify(response.json()), 200
+
+        # return jsonify({
+        #     'message': f'Sending to server: {server_name}',
+        #     'status': 'successful'
+        # }), 200
 
     except Exception as e:
         return jsonify(err_payload(e)), 400
     # END try-except
-# END catch_all
+# END home
 
 
 if __name__ == '__main__':
