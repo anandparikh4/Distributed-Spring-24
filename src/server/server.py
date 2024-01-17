@@ -1,4 +1,5 @@
 import os
+import sys
 from quart import Quart, Response, jsonify
 
 app = Quart(__name__)
@@ -35,4 +36,8 @@ async def heartbeat():
     return Response(status=200)
 
 if __name__ == '__main__':
-    app.run(port=8080, debug=True, use_reloader=False)
+    # Take port number from argument if provided
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    
+    # Run the server
+    app.run(port=port, debug=True, use_reloader=False)
