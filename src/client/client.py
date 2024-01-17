@@ -1,13 +1,11 @@
 import sys
 import signal
 import random
-import requests
-# import grequests
+import grequests
 
 # URL of the server
 url = 'http://127.0.0.1:5000'
 endpoints = ['add', 'rm', 'rep']
-
 
 # clean exit on ctrl-c
 def signal_handler(sig, frame):
@@ -30,9 +28,8 @@ def add_request(
         'hostnames': hostnames,
     }
 
-    response = requests.post(url + '/add', json=payload)
-    # response = grequests.post(url + '/add', json=payload)
-    # response = grequests.map([response])[0]
+    request = grequests.post(url + '/add', json=payload)
+    response = grequests.map([request])[0]
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END add_request
@@ -51,7 +48,9 @@ def delete_request(
         'hostnames': hostnames,
     }
 
-    response = requests.delete(url + '/rm', json=payload)
+    # response = requests.delete(url + '/rm', json=payload)
+    request = grequests.delete(url + '/rm', json=payload)
+    response = grequests.map([request])[0]
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END delete_request
@@ -62,7 +61,8 @@ def view_request():
     Send a request to the view endpoint.
     """
 
-    response = requests.get(url + '/rep')
+    request = grequests.get(url + '/rep')
+    response = grequests.map([request])[0]
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END view_request
@@ -120,7 +120,9 @@ def other_request(
         'request_id': request_id
     }
 
-    response = requests.get(f'{url}/{endpoint}', json=payload)
+    # response = requests.get(f'{url}/{endpoint}', json=payload)
+    request = grequests.get(f'{url}/{endpoint}', json=payload)
+    response = grequests.map([request])[0]
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END other_request
