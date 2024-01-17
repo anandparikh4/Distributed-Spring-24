@@ -1,7 +1,7 @@
 import os
-from flask import Flask, Response, jsonify
+from quart import Quart, Response, jsonify
 
-app = Flask(__name__)
+app = Quart(__name__)
 
 os.environ['SERVER_ID'] = '1234'
 
@@ -35,4 +35,4 @@ async def heartbeat():
     return Response(status=200)
 
 if __name__ == '__main__':
-    app.run(port=8080, debug=True)
+    app.run(port=8080, debug=True, use_reloader=False)
