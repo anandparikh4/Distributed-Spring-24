@@ -2,6 +2,7 @@ import asyncio
 import random
 import sys
 import grequests
+import docker
 from fifolock import FifoLock
 from utils import Read, Write, random_hostname, err_payload
 from quart import Quart, request, jsonify
@@ -20,6 +21,10 @@ replicas = ConsistentHashMap()
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
 MAX_COUNT = 5
+
+
+# Get Docker client
+docker_client = docker.from_env()
 
 
 @app.route('/rep', methods=['GET'])
