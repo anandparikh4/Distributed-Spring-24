@@ -6,14 +6,22 @@ class ConsistentHashMap:
 
     # constructor
     def __init__(self, hostnames=None, n_slots=512, n_virtual=9):
-        self.servers: dict[str, int] = {}                       # map: server-name -> server-index
-        self.slots: list[None | str] = [None] * n_slots         # slots
+        # map: server-name -> server-index
+        self.servers: dict[str, int] = {}
+
+        # slots
+        self.slots: list[None | str] = [None] * n_slots
         self.n_slots = n_slots
-        self.n_virtual = n_virtual                              # number of virtual copies to keep
+
+        # number of virtual copies to keep
+        self.n_virtual = n_virtual
         if hostnames is None:
-            hostnames = ["Server-1", "Server-2", "Server-3"]    # default hostnames
+            # default hostnames
+            hostnames = ["Server-1", "Server-2", "Server-3"]
+
         for hostname in hostnames:
-            self.add(hostname)                                  # populate slots
+            # populate slots
+            self.add(hostname)
 
     # length
     def __len__(self):
@@ -58,7 +66,8 @@ class ConsistentHashMap:
             server_idx += 1
         self.servers[hostname] = server_idx
         for virtual_idx in range(self.n_virtual):
-            server_hash = (self.serverHash(server_idx + 1, virtual_idx + 1)) % self.n_slots
+            server_hash = (self.serverHash(
+                server_idx + 1, virtual_idx + 1)) % self.n_slots
             while self.slots[server_hash] is not None:
                 server_hash = (server_hash + 1) % self.n_slots
             self.slots[server_hash] = hostname
@@ -74,7 +83,8 @@ class ConsistentHashMap:
         server_idx = self.servers[hostname]
         self.servers.pop(hostname)
         for virtual_idx in range(self.n_virtual):
-            server_hash = (self.serverHash(server_idx + 1, virtual_idx + 1)) % self.n_slots
+            server_hash = (self.serverHash(
+                server_idx + 1, virtual_idx + 1)) % self.n_slots
             while self.slots[server_hash] != hostname:
                 server_hash = (server_hash + 1) % self.n_slots
             self.slots[server_hash] = None
