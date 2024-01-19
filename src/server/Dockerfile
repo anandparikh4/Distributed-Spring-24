@@ -24,6 +24,9 @@ RUN pip install --no-cache-dir --no-index --find-links /wheels --requirement req
 # Remove the wheels
 RUN rm -rf /wheels /requirements.txt
 
+# Expose the port
+EXPOSE 5000
+
 # Copy the rest of the files
 COPY . .
 

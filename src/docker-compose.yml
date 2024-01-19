@@ -1,0 +1,60 @@
+version: "3.9"
+name: distributed_systems
+
+# define services
+services:
+
+  Server-1:
+    build: ./server
+    image: server:v1
+    container_name: Server-1
+    networks:
+      my_net:
+        aliases:
+          - Server-1
+    hostname: Server-1
+    environment:
+      SERVER_ID: 1
+
+  Server-2:
+    build: ./server
+    image: server:v1
+    container_name: Server-2
+    networks:
+      my_net:
+        aliases:
+          - Server-2
+    hostname: Server-2
+    environment:
+      SERVER_ID: 2
+
+  Server-3:
+    build: ./server
+    image: server:v1
+    container_name: Server-3
+    networks:
+      my_net:
+        aliases:
+          - Server-3
+    hostname: Server-3
+    environment:
+      SERVER_ID: 3
+
+  Load-Balancer:
+    build: ./load_balancer
+    image: load:v1
+    container_name: Load-Balancer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    ports:
+      - "5000:5000"
+    networks:
+      my_net:
+        aliases:
+          - Load-Balancer
+
+# define a network my_net
+networks:
+  my_net:
+    name: my_net

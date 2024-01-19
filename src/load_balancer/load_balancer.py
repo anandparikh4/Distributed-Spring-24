@@ -1,4 +1,5 @@
 import asyncio
+from http.client import REQUEST_TIMEOUT
 import random
 import sys
 import grequests
@@ -34,6 +35,15 @@ HEARTBEAT_INTERVAL = 10
 
 # timeout for stopping a container in seconds
 STOP_TIMEOUT = 5
+
+# timeout for requests in seconds
+REQUEST_TIMEOUT = 1
+
+# number of requests to send in a batch
+REQUEST_BATCH_SIZE = 5
+
+# async stuff is crazy so we need this
+loop = asyncio.get_event_loop()
 
 
 @app.route('/rep', methods=['GET'])
@@ -160,13 +170,12 @@ async def add():
                 serv_id += 1
 
                 # TODO: spawn new docker containers for the new hostnames
+
                 container_config = {
-                    'image': 'server',
+                    'image': 'server:v1',
                     'detach': True,
                     'env': [f'SERVER_ID={serv_id}'],
                     'hostname': hostname,
-                    'network': 'my_net',
-                    'aliases': [hostname],
                 }
 
                 # create the container
@@ -174,6 +183,15 @@ async def add():
                     name=hostname,
                     config=container_config,
                 )
+
+                # Attach the container to the network and set the alias
+                my_net = await docker.networks.get('my_net')
+                await my_net.connect({
+                    'Container': container.id,
+                    'EndpointConfig': {
+                        'Aliases': [hostname]
+                    }
+                })
 
                 ic(f'Created container for {hostname}')
 
@@ -184,7 +202,7 @@ async def add():
 
                 ic(f'Started container for {hostname}')
 
-                await docker.close()
+                # await docker.close()
 
                 await asyncio.sleep(0)
 
@@ -309,7 +327,7 @@ async def delete():
 
                 ic(f'Deleted container for {hostname}')
 
-                await docker.close()
+                # await docker.close()
 
                 await asyncio.sleep(0)
 
@@ -369,8 +387,7 @@ async def home():
             raise Exception('No servers are available')
 
         # Send the request to the server asynchronously
-        # serv_request = grequests.get('http://127.0.0.1:8080/home')
-        serv_request = grequests.get(f'http://{server_name}:8080/home')
+        serv_request = grequests.get(f'http://{server_name}:5000/home')
 
         # async stuff happens here (I think lol)
         serv_response = grequests.map([serv_request])[0]
@@ -430,14 +447,13 @@ async def get_heartbeats():
             # Get the list of server replica hostnames
             hostnames = replicas.getServerList().copy()
 
-            # port = 12345
+            heartbeats = \
+                [grequests.get(f'http://{server_name}:5000/heartbeat',
+                               timeout=REQUEST_TIMEOUT)
+                 for server_name in replicas.getServerList()]
 
-            heartbeats = [grequests.get(f'http://{server_name}:8080/heartbeat')
-                          for server_name in replicas.getServerList()]
-            # heartbeats = [grequests.get(f'http://127.0.0.1:{port + i}/heartbeat')
-            #               for i in range(len(hostnames))]  # TODO: change to server_name
-
-            for i, response in grequests.imap_enumerated(heartbeats):
+            for i, response in grequests.imap_enumerated(
+                    heartbeats, size=REQUEST_BATCH_SIZE):
                 # To allow other tasks to run
                 await asyncio.sleep(0)
 
@@ -480,7 +496,7 @@ async def handle_flatline(server_name: str):
 
     ic(f'Restarted container for {server_name}')
 
-    await docker.close()
+    # await docker.close()
 
     await asyncio.sleep(0)
 
@@ -492,4 +508,5 @@ if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
 
     # Run the server
-    app.run(port=port, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=True,
+            use_reloader=False, loop=loop)
