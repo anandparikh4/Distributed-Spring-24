@@ -3,6 +3,7 @@ import random
 import sys
 import grequests
 import docker
+from docker.models.containers import Container
 from fifolock import FifoLock
 from utils import Read, Write, random_hostname, err_payload
 from quart import Quart, request, jsonify
@@ -20,11 +21,17 @@ replicas = ConsistentHashMap()
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
-MAX_COUNT = 5
+MAX_FAIL_COUNT = 5  # max number of consecutive heartbeat fails
+HEARTBEAT_INTERVAL = 10  # interval between heartbeat checks in seconds
+STOP_TIMEOUT = 5  # timeout for stopping a container in seconds
 
 
 # Get Docker client
 docker_client = docker.from_env()
+
+
+# server unique id generator
+serv_id = 3  # already have 3 servers running
 
 
 @app.route('/rep', methods=['GET'])
@@ -40,7 +47,6 @@ async def rep():
     """
 
     global replicas
-    global heartbeat_fail_count
 
     async with lock(Read):
         # Return the response payload
@@ -93,6 +99,7 @@ async def add():
 
     global replicas
     global heartbeat_fail_count
+    global serv_id
 
     try:
         # Get the request payload
@@ -147,8 +154,46 @@ async def add():
                 # Edit the flatline map
                 heartbeat_fail_count[hostname] = 0
 
+                serv_id += 1
+
                 # TODO: spawn new docker containers for the new hostnames
+                container_config = {
+                    'image': 'server',
+                    'detach': True,
+                    'environment': {
+                        "SERVER_ID": serv_id
+                    },
+                    'name': hostname,
+                    'hostname': hostname,
+                    'network': 'docker_my_net',
+                    'aliases': [hostname],
+                    'detach': True,
+                }
+
+                # create the containerq
+                container: Container = docker_client.containers.create(
+                    **container_config)  # type: ignore
+
+                ic(container.status)
+
+                # check if container is created
+                if container.status != 'created':
+                    raise Exception(
+                        f'Container for hostname `{hostname}` could not be created')
+
+                container.start()
+                await asyncio.sleep(0)
+                container.reload()  # update container status
+
+                ic(container.status)
+
+                # check if container is running
+                if container.status != 'running':
+                    raise Exception(
+                        f'Container for hostname `{hostname}` could not be started')
+
             # END for
+
         # END async with lock
 
         ic(replicas.getServerList())
@@ -258,6 +303,32 @@ async def delete():
                 heartbeat_fail_count.pop(hostname, None)
 
                 # TODO: kill docker containers for the deleted hostnames
+                container: Container = docker_client.containers.get(
+                    hostname)  # type: ignore
+
+                ic(container.status)
+
+                # check if container is running
+                if container.status != 'running':
+                    raise Exception(
+                        f'Container for hostname `{hostname}` is not running')
+
+                container.stop(timeout=STOP_TIMEOUT)
+                await asyncio.sleep(0)
+                container.reload()  # update container status
+
+                ic(container.status)
+
+                # check if container is stopped
+                if container.status != 'exited':
+                    raise Exception(
+                        f'Container for hostname `{hostname}` could not be stopped')
+
+                container.remove()
+                await asyncio.sleep(0)
+
+            # END for
+
         # END async with lock
 
         ic(replicas.getServerList())
@@ -309,8 +380,9 @@ async def home():
             raise Exception('No servers are available')
 
         # Send the request to the server asynchronously
-        # serv_response = requests.get(f'http://{server_name}:8080/home')
-        serv_request = grequests.get('http://127.0.0.1:8080/home')
+        # serv_request = grequests.get('http://127.0.0.1:8080/home')
+        serv_request = grequests.get(f'http://{server_name}:8080/home')
+
         # async stuff happens here (I think lol)
         serv_response = grequests.map([serv_request])[0]
 
@@ -369,7 +441,7 @@ async def get_heartbeats():
             # Get the list of server replica hostnames
             hostnames = replicas.getServerList().copy()
 
-            port = 12345
+            # port = 12345
 
             heartbeats = [grequests.get(f'http://{server_name}:8080/heartbeat')
                           for server_name in replicas.getServerList()]
@@ -377,27 +449,28 @@ async def get_heartbeats():
             #               for i in range(len(hostnames))]  # TODO: change to server_name
 
             for i, response in grequests.imap_enumerated(heartbeats):
+                # To allow other tasks to run
+                await asyncio.sleep(0)
+
                 if response is None:
                     # Increment the fail count for the server replica
                     heartbeat_fail_count[hostnames[i]] = \
                         heartbeat_fail_count.get(hostnames[i], 0) + 1
 
                     # If fail count exceeds the max count, respawn the server replica
-                    if heartbeat_fail_count[hostnames[i]] >= MAX_COUNT:
+                    if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
                         handle_flatline(hostnames[i])
                 else:
                     # Reset the fail count for the server replica
                     heartbeat_fail_count[hostnames[i]] = 0
                 # END if-else
 
-                # To allow other tasks to run
-                await asyncio.sleep(0)
             # END for
 
             ic(heartbeat_fail_count)
         # END async with lock
 
-        await asyncio.sleep(5)
+        await asyncio.sleep(HEARTBEAT_INTERVAL)
     # END while
 # END get_heartbeats
 
@@ -411,6 +484,12 @@ def handle_flatline(server_name: str):
     ic(msg)
 
     # TODO: respawn the server replica using docker
+    container: Container = docker_client.containers.get(
+        server_name)  # type: ignore
+
+    ic(container.status)
+
+    container.restart(timeout=STOP_TIMEOUT)
 
 # END handle_flatline
 

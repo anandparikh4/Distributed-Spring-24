@@ -4,7 +4,7 @@ from quart import Quart, Response, jsonify
 
 app = Quart(__name__)
 
-os.environ['SERVER_ID'] = '1234'
+# os.environ['SERVER_ID'] = '1234'
 
 
 @app.route('/home', methods=['GET'])
