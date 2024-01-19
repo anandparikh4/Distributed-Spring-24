@@ -2,8 +2,7 @@ import asyncio
 import random
 import sys
 import grequests
-import docker
-from docker.models.containers import Container
+import aiodocker
 from fifolock import FifoLock
 from utils import Read, Write, random_hostname, err_payload
 from quart import Quart, request, jsonify
@@ -27,7 +26,7 @@ STOP_TIMEOUT = 5  # timeout for stopping a container in seconds
 
 
 # Get Docker client
-docker_client = docker.from_env()
+docker = aiodocker.Docker()
 
 
 # server unique id generator
@@ -154,58 +153,53 @@ async def add():
                 # Edit the flatline map
                 heartbeat_fail_count[hostname] = 0
 
+                # increment server id
                 serv_id += 1
 
                 # TODO: spawn new docker containers for the new hostnames
                 container_config = {
                     'image': 'server',
                     'detach': True,
-                    'environment': {
-                        "SERVER_ID": serv_id
-                    },
-                    'name': hostname,
+                    'env': [f'SERVER_ID={serv_id}'],
                     'hostname': hostname,
-                    'network': 'docker_my_net',
+                    'network': 'my_net',
                     'aliases': [hostname],
-                    'detach': True,
                 }
 
-                # create the containerq
-                container: Container = docker_client.containers.create(
-                    **container_config)  # type: ignore
+                # create the container
+                container = await docker.containers.create_or_replace(
+                    name=hostname,
+                    config=container_config,
+                )
 
-                ic(container.status)
+                ic(f'Created container for {hostname}')
 
-                # check if container is created
-                if container.status != 'created':
-                    raise Exception(
-                        f'Container for hostname `{hostname}` could not be created')
+                # start the container
+                await container.start()
 
-                container.start()
+                # TODO: do error handling for container start
+
+                ic(f'Started container for {hostname}')
+
+                await docker.close()
+
                 await asyncio.sleep(0)
-                container.reload()  # update container status
-
-                ic(container.status)
-
-                # check if container is running
-                if container.status != 'running':
-                    raise Exception(
-                        f'Container for hostname `{hostname}` could not be started')
 
             # END for
 
+            # this also should be locked
+            ic(replicas.getServerList())
+
+            # Return the response payload
+            return jsonify({
+                'message': {
+                    'N': len(replicas),
+                    'replicas': replicas.getServerList()
+                },
+                'status': 'success'
+            }), 200
+
         # END async with lock
-
-        ic(replicas.getServerList())
-
-        # Return the response payload
-        return jsonify({
-            'message': {
-                'N': len(replicas),
-                'replicas': replicas.getServerList()
-            },
-            'status': 'success'
-        }), 200
 
     except Exception as e:
         return jsonify(err_payload(e)), 400
@@ -303,44 +297,34 @@ async def delete():
                 heartbeat_fail_count.pop(hostname, None)
 
                 # TODO: kill docker containers for the deleted hostnames
-                container: Container = docker_client.containers.get(
-                    hostname)  # type: ignore
+                container = await docker.containers.get(hostname)
 
-                ic(container.status)
+                await container.stop(timeout=STOP_TIMEOUT)
+                await container.delete(force=True)
 
-                # check if container is running
-                if container.status != 'running':
-                    raise Exception(
-                        f'Container for hostname `{hostname}` is not running')
+                # TODO: do error handling for container stop and delete
 
-                container.stop(timeout=STOP_TIMEOUT)
-                await asyncio.sleep(0)
-                container.reload()  # update container status
+                ic(f'Deleted container for {hostname}')
 
-                ic(container.status)
+                await docker.close()
 
-                # check if container is stopped
-                if container.status != 'exited':
-                    raise Exception(
-                        f'Container for hostname `{hostname}` could not be stopped')
-
-                container.remove()
                 await asyncio.sleep(0)
 
             # END for
 
+            # this also should be locked
+            ic(replicas.getServerList())
+
+            # Return the response payload
+            return jsonify({
+                'message': {
+                    'N': len(replicas),
+                    'replicas': replicas.getServerList()
+                },
+                'status': 'success'
+            }), 200
+
         # END async with lock
-
-        ic(replicas.getServerList())
-
-        # Return the response payload
-        return jsonify({
-            'message': {
-                'N': len(replicas),
-                'replicas': replicas.getServerList()
-            },
-            'status': 'success'
-        }), 200
 
     except Exception as e:
         return jsonify(err_payload(e)), 400
@@ -374,7 +358,9 @@ async def home():
         ic(payload)
         request_id = int(payload.get("request_id", -1))
 
-        server_name = replicas.find(request_id)
+        server_name = None
+        async with lock(Read):
+            server_name = replicas.find(request_id)
 
         if server_name is None:
             raise Exception('No servers are available')
@@ -459,7 +445,7 @@ async def get_heartbeats():
 
                     # If fail count exceeds the max count, respawn the server replica
                     if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                        handle_flatline(hostnames[i])
+                        await handle_flatline(hostnames[i])
                 else:
                     # Reset the fail count for the server replica
                     heartbeat_fail_count[hostnames[i]] = 0
@@ -475,21 +461,25 @@ async def get_heartbeats():
 # END get_heartbeats
 
 
-def handle_flatline(server_name: str):
+async def handle_flatline(server_name: str):
     """
     Handles the flatline of a server replica.
     """
 
-    msg = f'Flatline of server replica `{server_name}` detected'
-    ic(msg)
+    ic(f'Flatline of server replica `{server_name}` detected')
 
     # TODO: respawn the server replica using docker
-    container: Container = docker_client.containers.get(
-        server_name)  # type: ignore
+    container = await docker.containers.get(server_name)
 
-    ic(container.status)
+    await container.restart(timeout=STOP_TIMEOUT)
 
-    container.restart(timeout=STOP_TIMEOUT)
+    # TODO: do error handling for container restart
+
+    ic(f'Restarted container for {server_name}')
+
+    await docker.close()
+
+    await asyncio.sleep(0)
 
 # END handle_flatline
 
