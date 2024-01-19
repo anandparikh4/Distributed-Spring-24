@@ -1,5 +1,4 @@
 import asyncio
-from http.client import REQUEST_TIMEOUT
 import random
 import sys
 import grequests
@@ -387,7 +386,7 @@ async def home():
             raise Exception('No servers are available')
 
         # Send the request to the server asynchronously
-        serv_request = grequests.get(f'http://{server_name}:5000/home')
+        serv_request = grequests.get(f'http://{server_name}:5000/home', timeout=REQUEST_TIMEOUT)
 
         # async stuff happens here (I think lol)
         serv_response = grequests.map([serv_request])[0]
