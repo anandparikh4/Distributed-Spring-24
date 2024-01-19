@@ -17,20 +17,23 @@ lock = FifoLock()
 # List to store web server replica hostnames
 replicas = ConsistentHashMap()
 
-
-# Map to store heartbeat fail counts for each server replica.
-heartbeat_fail_count: dict[str, int] = {}
-MAX_FAIL_COUNT = 5  # max number of consecutive heartbeat fails
-HEARTBEAT_INTERVAL = 10  # interval between heartbeat checks in seconds
-STOP_TIMEOUT = 5  # timeout for stopping a container in seconds
-
-
 # Get Docker client
 docker = aiodocker.Docker()
 
+# Map to store heartbeat fail counts for each server replica.
+heartbeat_fail_count: dict[str, int] = {}
 
 # server unique id generator
 serv_id = 3  # already have 3 servers running
+
+# max number of consecutive heartbeat fails
+MAX_FAIL_COUNT = 5
+
+# interval between heartbeat checks in seconds
+HEARTBEAT_INTERVAL = 10
+
+# timeout for stopping a container in seconds
+STOP_TIMEOUT = 5
 
 
 @app.route('/rep', methods=['GET'])
@@ -38,11 +41,11 @@ async def rep():
     """
     Return the number and list of replica hostnames.
 
-    Response payload:
-        message:
-            N: number of replicas
-            replicas: list of replica hostnames
-        status: status of the request
+    `Response payload:`
+        `message:`
+            `N: number of replicas`
+            `replicas: list of replica hostnames`
+        `status: status of the request`
     """
 
     global replicas
