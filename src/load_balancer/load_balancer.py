@@ -173,8 +173,7 @@ async def add():
                 # increment server id
                 serv_id += 1
 
-                # TODO: spawn new docker containers for the new hostnames
-
+                # spawn new docker containers for the new hostnames
                 container_config = {
                     'image': 'server:v1',
                     'detach': True,
@@ -328,7 +327,7 @@ async def delete():
                 # Edit the flatline map
                 heartbeat_fail_count.pop(hostname, None)
 
-                # TODO: kill docker containers for the deleted hostnames
+                # stop docker containers for the deleted hostnames
                 container = await docker.containers.get(hostname)
 
                 await container.stop(timeout=STOP_TIMEOUT)
@@ -429,10 +428,10 @@ async def catch_all(path):
     Catch all other routes and return an error message.
     """
 
-    return jsonify({
+    return jsonify(ic({
         'message': f'<Error> `/{path}` endpoint does not exist in server replicas',
         'status': 'failure'
-    }), 400
+    })), 400
 # END catch_all
 
 
@@ -440,6 +439,8 @@ async def catch_all(path):
 async def my_startup():
     """
     Startup function to be run before the app starts.
+
+    Start heartbeat background task.
     """
 
     # Register the heartbeat background task
@@ -448,6 +449,38 @@ async def my_startup():
     # To allow other tasks to run
     await asyncio.sleep(0)
 # END my_startup
+
+
+@app.after_serving
+async def my_shutdown():
+    """
+    Shutdown function to be run after the app stops.
+
+    1. Stop the heartbeat background task.
+    2. Stop all server replicas.
+    """
+
+    # Stop the heartbeat background task
+    app.background_tasks.pop().cancel()
+
+    # Get Docker client
+    docker = aiodocker.Docker()
+
+    # Stop all server replicas
+    for server_name in replicas.getServerList():
+        try:
+            container = await docker.containers.get(server_name)
+
+            await container.stop(timeout=STOP_TIMEOUT)
+            await container.delete(force=True)
+        except Exception as e:
+            print(f'ERROR | {e}', file=sys.stderr)
+    # END for
+
+    # close docker session
+    await docker.close()
+
+# END my_shutdown
 
 
 async def get_heartbeats():
@@ -459,46 +492,51 @@ async def get_heartbeats():
     global replicas
     global heartbeat_fail_count
 
-    while True:
-        async with lock(Read):
-            # Get the list of server replica hostnames
-            hostnames = replicas.getServerList().copy()
+    try:
+        while True:
+            # check heartbeat every `HEARTBEAT_INTERVAL` seconds
+            await asyncio.sleep(HEARTBEAT_INTERVAL)
 
-            heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
-                              for server_name in hostnames]
-            heartbeats = [None] * len(hostnames)
+            async with lock(Read):
+                # Get the list of server replica hostnames
+                hostnames = replicas.getServerList().copy()
 
-            # Convert to aiohttp request
-            timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                heartbeats = await gather_with_concurrency(
-                    session, REQUEST_BATCH_SIZE, *heartbeat_urls)
-            # END async with
+                heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
+                                  for server_name in hostnames]
+                heartbeats = [None] * len(hostnames)
 
-            # To allow other tasks to run
-            await asyncio.sleep(0)
+                # Convert to aiohttp request
+                timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    heartbeats = await gather_with_concurrency(
+                        session, REQUEST_BATCH_SIZE, *heartbeat_urls)
+                # END async with
 
-            for i, response in enumerate(heartbeats):
-                if response is None or not response.status == 200:
-                    # Increment the fail count for the server replica
-                    heartbeat_fail_count[hostnames[i]] = \
-                        heartbeat_fail_count.get(hostnames[i], 0) + 1
+                # To allow other tasks to run
+                await asyncio.sleep(0)
 
-                    # If fail count exceeds the max count, respawn the server replica
-                    if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                        await handle_flatline(hostnames[i])
-                else:
-                    # Reset the fail count for the server replica
-                    heartbeat_fail_count[hostnames[i]] = 0
-                # END if-else
+                for i, response in enumerate(heartbeats):
+                    if response is None or not response.status == 200:
+                        # Increment the fail count for the server replica
+                        heartbeat_fail_count[hostnames[i]] = \
+                            heartbeat_fail_count.get(hostnames[i], 0) + 1
 
-            # END for
+                        # If fail count exceeds the max count, respawn the server replica
+                        if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
+                            await handle_flatline(hostnames[i])
+                    else:
+                        # Reset the fail count for the server replica
+                        heartbeat_fail_count[hostnames[i]] = 0
+                    # END if-else
 
-            ic(heartbeat_fail_count)
-        # END async with lock
+                # END for
 
-        await asyncio.sleep(HEARTBEAT_INTERVAL)
-    # END while
+                ic(heartbeat_fail_count)
+            # END async with lock
+
+        # END while
+    except asyncio.CancelledError:
+        pass
 # END get_heartbeats
 
 
@@ -513,7 +551,7 @@ async def handle_flatline(server_name: str):
     # Get Docker client
     docker = aiodocker.Docker()
 
-    # TODO: respawn the server replica using docker
+    # respawn the server replica using docker
     container = await docker.containers.get(server_name)
 
     await container.restart(timeout=STOP_TIMEOUT)
