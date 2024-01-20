@@ -43,6 +43,9 @@ REQUEST_TIMEOUT = 1
 # number of requests to send in a batch
 REQUEST_BATCH_SIZE = 10
 
+# number of docker tasks to perform in a batch
+DOCKER_TASK_BATCH_SIZE = 10
+
 # async stuff is crazy so we need this
 loop = asyncio.get_event_loop()
 
@@ -163,6 +166,52 @@ async def add():
             # Get Docker client
             docker = aiodocker.Docker()
 
+            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+
+            async def spawn_container(serv_id: int, hostname: str):
+                async with semaphore:
+                    # spawn new docker containers for the new hostnames
+                    container_config = {
+                        'image': 'server:v1',
+                        'detach': True,
+                        'env': [f'SERVER_ID={serv_id}',
+                                'DEBUG=true'],
+                        'hostname': hostname,
+                    }
+
+                    # create the container
+                    container = await docker.containers.create_or_replace(
+                        name=hostname,
+                        config=container_config,
+                    )
+
+                    # Attach the container to the network and set the alias
+                    my_net = await docker.networks.get('my_net')
+                    await my_net.connect({
+                        'Container': container.id,
+                        'EndpointConfig': {
+                            'Aliases': [hostname]
+                        }
+                    })
+
+                    print(f'CREATE | Created container for {hostname}',
+                          file=sys.stderr)
+
+                    # start the container
+                    await container.start()
+
+                    # TODO: do error handling for container start
+
+                    print(f'SPAWN | Started container for {hostname}',
+                          file=sys.stderr)
+
+                    await asyncio.sleep(0)
+                # END async with semaphore
+            # END spawn_container
+
+            # Define tasks
+            tasks = []
+
             # Add the hostnames to the list
             for hostname in hostnames:
                 replicas.add(hostname)
@@ -173,47 +222,19 @@ async def add():
                 # increment server id
                 serv_id += 1
 
-                # spawn new docker containers for the new hostnames
-                container_config = {
-                    'image': 'server:v1',
-                    'detach': True,
-                    'env': [f'SERVER_ID={serv_id}',
-                            'DEBUG=true'],
-                    'hostname': hostname,
-                }
-
-                # create the container
-                container = await docker.containers.create_or_replace(
-                    name=hostname,
-                    config=container_config,
-                )
-
-                # Attach the container to the network and set the alias
-                my_net = await docker.networks.get('my_net')
-                await my_net.connect({
-                    'Container': container.id,
-                    'EndpointConfig': {
-                        'Aliases': [hostname]
-                    }
-                })
-
-                print(f'CREATE | Created container for {hostname}',
-                      file=sys.stderr)
-
-                # start the container
-                await container.start()
-
-                # TODO: do error handling for container start
-
-                print(f'SPAWN | Started container for {hostname}',
-                      file=sys.stderr)
-
-                await asyncio.sleep(0)
+                tasks.append(spawn_container(serv_id, hostname))
 
             # END for
 
+            # Wait for all tasks to complete
+            ret = await my_gather(*tasks, return_exceptions=True)
+
             # close docker session
             await docker.close()
+
+            # check if any errors occured
+            if any(ret):
+                raise Exception(f'Error while spawning containers: {ret}')
 
             # this also should be locked
             ic(replicas.getServerList())
@@ -320,6 +341,28 @@ async def delete():
             # Get Docker client
             docker = aiodocker.Docker()
 
+            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+
+            async def stop_container(hostname: str):
+                async with semaphore:
+                    # stop docker containers for the deleted hostnames
+                    container = await docker.containers.get(hostname)
+
+                    await container.stop(timeout=STOP_TIMEOUT)
+                    await container.delete(force=True)
+
+                    # TODO: do error handling for container stop and delete
+
+                    print(f'REMOVE | Deleted container for {hostname}',
+                          file=sys.stderr)
+
+                    await asyncio.sleep(0)
+                # END async with semaphore
+            # END stop_container
+
+            # Define tasks
+            tasks = []
+
             # Delete the hostnames from the list
             for hostname in hostnames:
                 replicas.remove(hostname)
@@ -327,25 +370,18 @@ async def delete():
                 # Edit the flatline map
                 heartbeat_fail_count.pop(hostname, None)
 
-                # stop docker containers for the deleted hostnames
-                container = await docker.containers.get(hostname)
-
-                await container.stop(timeout=STOP_TIMEOUT)
-                await container.delete(force=True)
-
-                # TODO: do error handling for container stop and delete
-
-                print(f'REMOVE | Deleted container for {hostname}',
-                      file=sys.stderr)
-
-                # await docker.close()
-
-                await asyncio.sleep(0)
-
+                tasks.append(stop_container(hostname))
             # END for
+
+            # Wait for all tasks to complete
+            ret = await my_gather(*tasks, return_exceptions=True)
 
             # close docker session
             await docker.close()
+
+            # check if any errors occured
+            if any(ret):
+                raise Exception(f'Error while stopping containers: {ret}')
 
             # this also should be locked
             ic(replicas.getServerList())
@@ -491,6 +527,8 @@ async def get_heartbeats():
 
     global replicas
     global heartbeat_fail_count
+
+    print('START | Heartbeat background task started', file=sys.stderr)
 
     try:
         while True:

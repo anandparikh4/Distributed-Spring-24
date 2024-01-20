@@ -39,6 +39,16 @@ def err_payload(err: Exception):
 # END err_payload
 
 
+async def my_gather(*tasks, return_exceptions=True):
+    """
+    Gather with concurrency from aiohttp async session
+    """
+
+    res = await asyncio.gather(*tasks, return_exceptions=return_exceptions)
+    return [None if isinstance(r, BaseException) else r for r in res]
+# END gather_with_concurrency
+
+
 async def gather_with_concurrency(
     session: aiohttp.ClientSession,
     batch: int,
@@ -52,12 +62,15 @@ async def gather_with_concurrency(
 
     async def fetch(url: str):
         async with semaphore:
+            await asyncio.sleep(0)
+
             async with session.get(url) as response:
                 await response.read()
             return response
     # END fetch
 
-    res = await asyncio.gather(*[fetch(url) for url in urls],
-                               return_exceptions=True)
-    return [None if isinstance(r, BaseException) else r for r in res]
+    return await my_gather(*[fetch(url) for url in urls],
+                           return_exceptions=True)
+
+
 # END gather_with_concurrency
