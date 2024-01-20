@@ -1,14 +1,15 @@
+import aiodocker
+import aiohttp
 import asyncio
+import os
 import random
 import sys
-import os
-import grequests
-import aiodocker
 from fifolock import FifoLock
-from utils import Read, Write, random_hostname, err_payload
-from quart import Quart, request, jsonify
 from icecream import ic
+from quart import Quart, request, jsonify
+
 from hash import ConsistentHashMap
+from utils import *
 
 app = Quart(__name__)
 lock = FifoLock()
@@ -198,7 +199,7 @@ async def add():
                 })
 
                 print(f'CREATE | Created container for {hostname}',
-                   file=sys.stderr)
+                      file=sys.stderr)
 
                 # start the container
                 await container.start()
@@ -206,7 +207,7 @@ async def add():
                 # TODO: do error handling for container start
 
                 print(f'SPAWN | Started container for {hostname}',
-                   file=sys.stderr)
+                      file=sys.stderr)
 
                 await asyncio.sleep(0)
 
@@ -336,7 +337,7 @@ async def delete():
                 # TODO: do error handling for container stop and delete
 
                 print(f'REMOVE | Deleted container for {hostname}',
-                   file=sys.stderr)
+                      file=sys.stderr)
 
                 # await docker.close()
 
@@ -401,12 +402,12 @@ async def home():
         if server_name is None:
             raise Exception('No servers are available')
 
-        # Send the request to the server asynchronously
-        serv_request = grequests.get(f'http://{server_name}:5000/home',
-                                     timeout=REQUEST_TIMEOUT)
-
-        # async stuff happens here (I think lol)
-        serv_response = grequests.map([serv_request])[0]
+        # Convert to aiohttp request
+        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            serv_response = await gather_with_concurrency(
+                session, REQUEST_BATCH_SIZE, *[f'http://{server_name}:5000/home'])
+            serv_response = serv_response[0]
 
         # To allow other tasks to run
         await asyncio.sleep(0)
@@ -414,7 +415,7 @@ async def home():
         if serv_response is None:
             raise Exception('Server did not respond')
 
-        return jsonify(ic(serv_response.json())), 200
+        return jsonify(ic(await serv_response.json())), 200
 
     except Exception as e:
         return jsonify(ic(err_payload(e))), 400
@@ -463,17 +464,22 @@ async def get_heartbeats():
             # Get the list of server replica hostnames
             hostnames = replicas.getServerList().copy()
 
-            heartbeats = \
-                [grequests.get(f'http://{server_name}:5000/heartbeat',
-                               timeout=REQUEST_TIMEOUT)
-                 for server_name in replicas.getServerList()]
+            heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
+                              for server_name in hostnames]
+            heartbeats = [None] * len(hostnames)
 
-            for i, response in grequests.imap_enumerated(
-                    heartbeats, size=REQUEST_BATCH_SIZE):
-                # To allow other tasks to run
-                await asyncio.sleep(0)
+            # Convert to aiohttp request
+            timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                heartbeats = await gather_with_concurrency(
+                    session, REQUEST_BATCH_SIZE, *heartbeat_urls)
+            # END async with
 
-                if response is None:
+            # To allow other tasks to run
+            await asyncio.sleep(0)
+
+            for i, response in enumerate(heartbeats):
+                if response is None or not response.status == 200:
                     # Increment the fail count for the server replica
                     heartbeat_fail_count[hostnames[i]] = \
                         heartbeat_fail_count.get(hostnames[i], 0) + 1
@@ -501,7 +507,8 @@ async def handle_flatline(server_name: str):
     Handles the flatline of a server replica.
     """
 
-    print(f'FLATLINE | Flatline of server replica `{server_name}` detected', file=sys.stderr)
+    print(
+        f'FLATLINE | Flatline of server replica `{server_name}` detected', file=sys.stderr)
 
     # Get Docker client
     docker = aiodocker.Docker()

@@ -1,6 +1,7 @@
+import aiohttp
 import asyncio
-import time
 import random
+import time
 
 
 class Read(asyncio.Future):
@@ -36,3 +37,27 @@ def err_payload(err: Exception):
         'status': 'failure'
     }
 # END err_payload
+
+
+async def gather_with_concurrency(
+    session: aiohttp.ClientSession,
+    batch: int,
+    *urls: str
+):
+    """
+    Gather with concurrency from aiohttp async session
+    """
+
+    semaphore = asyncio.Semaphore(batch)
+
+    async def fetch(url: str):
+        async with semaphore:
+            async with session.get(url) as response:
+                await response.read()
+            return response
+    # END fetch
+
+    res = await asyncio.gather(*[fetch(url) for url in urls],
+                               return_exceptions=True)
+    return [None if isinstance(r, BaseException) else r for r in res]
+# END gather_with_concurrency

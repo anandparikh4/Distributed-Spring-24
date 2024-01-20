@@ -1,4 +1,4 @@
-grequests==0.7.0
+aiohttp==3.9.1
 fifolock==0.0.20
 Quart==0.19.4
 icecream==2.1.3
