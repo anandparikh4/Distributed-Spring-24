@@ -27,6 +27,9 @@ RUN rm -rf /wheels /requirements.txt
 # Expose the port
 EXPOSE 5000
 
+# Set the environment variables
+ENV DEBUG='False'
+
 # Copy the rest of the files
 COPY . .
 

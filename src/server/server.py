@@ -1,11 +1,16 @@
 import os
 import sys
+from icecream import ic
 from quart import Quart, Response, jsonify
 
 app = Quart(__name__)
 
-# os.environ['SERVER_ID'] = '1234'
+SERVER_ID = os.environ.get('SERVER_ID', '0')
 
+ic.configureOutput(prefix=f'[Server: {SERVER_ID}] | ')
+# Disable icecream debug messages if DEBUG is not set to true
+if not os.environ.get('DEBUG', 'false').lower() == 'true':
+    ic.disable()
 
 @app.route('/home', methods=['GET'])
 async def home():
@@ -17,10 +22,10 @@ async def home():
         status: status of the response
     """
 
-    return jsonify({
-        'message': f"Hello from Server: {os.environ['SERVER_ID']}",
+    return jsonify(ic({
+        'message': f"Hello from Server: {SERVER_ID}",
         'status': "successful"
-    }), 200
+    })), 200
 
 
 @app.route('/heartbeat', methods=['GET'])
@@ -40,4 +45,5 @@ if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
 
     # Run the server
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=True,
+            use_reloader=False)

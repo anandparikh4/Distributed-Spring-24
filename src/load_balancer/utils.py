@@ -7,12 +7,14 @@ class Read(asyncio.Future):
     @staticmethod
     def is_compatible(holds):
         return not holds[Write]
+# END class Read
 
 
 class Write(asyncio.Future):
     @staticmethod
     def is_compatible(holds):
         return not holds[Read] and not holds[Write]
+# END class Write
 
 
 def random_hostname():
@@ -33,3 +35,4 @@ def err_payload(err: Exception):
         'message': f'<Error> {err}',
         'status': 'failure'
     }
+# END err_payload

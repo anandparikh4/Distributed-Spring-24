@@ -15,6 +15,7 @@ services:
     hostname: Server-1
     environment:
       SERVER_ID: 1
+      DEBUG: "true"
 
   Server-2:
     build: ./server
@@ -27,6 +28,7 @@ services:
     hostname: Server-2
     environment:
       SERVER_ID: 2
+      DEBUG: "true"
 
   Server-3:
     build: ./server
@@ -39,6 +41,7 @@ services:
     hostname: Server-3
     environment:
       SERVER_ID: 3
+      DEBUG: "true"
 
   Load-Balancer:
     build: ./load_balancer
@@ -53,6 +56,17 @@ services:
       my_net:
         aliases:
           - Load-Balancer
+    environment:
+      DEBUG: "true"
+
+    # Client:
+    #   build: ./client
+    #   image: client:v1
+    #   container_name: Client
+    #   networks:
+    #     my_net:
+    #       aliases:
+    #         - Client
 
 # define a network my_net
 networks:

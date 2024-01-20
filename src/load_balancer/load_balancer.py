@@ -1,6 +1,7 @@
 import asyncio
 import random
 import sys
+import os
 import grequests
 import aiodocker
 from fifolock import FifoLock
@@ -12,13 +13,13 @@ from hash import ConsistentHashMap
 app = Quart(__name__)
 lock = FifoLock()
 
-# ic.disable()
+ic.configureOutput(prefix='[LB] | ',)
+# Disable icecream debug messages if DEBUG is not set to true
+if not os.environ.get('DEBUG', 'false').lower() == 'true':
+    ic.disable()
 
 # List to store web server replica hostnames
 replicas = ConsistentHashMap()
-
-# Get Docker client
-docker = aiodocker.Docker()
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
@@ -39,7 +40,7 @@ STOP_TIMEOUT = 5
 REQUEST_TIMEOUT = 1
 
 # number of requests to send in a batch
-REQUEST_BATCH_SIZE = 5
+REQUEST_BATCH_SIZE = 10
 
 # async stuff is crazy so we need this
 loop = asyncio.get_event_loop()
@@ -61,13 +62,13 @@ async def rep():
 
     async with lock(Read):
         # Return the response payload
-        return jsonify({
+        return jsonify(ic({
             'message': {
                 'N': len(replicas),
                 'replicas': replicas.getServerList(),
             },
             'status': 'successful',
-        }), 200
+        })), 200
     # END async with lock
 # END rep
 
@@ -156,7 +157,10 @@ async def add():
                 raise Exception(
                     f'Hostnames `{hostnames_set & replicas_set}` are already in replicas')
 
-            ic("To add:", hostnames)
+            ic("To add: ", hostnames)
+
+            # Get Docker client
+            docker = aiodocker.Docker()
 
             # Add the hostnames to the list
             for hostname in hostnames:
@@ -173,7 +177,8 @@ async def add():
                 container_config = {
                     'image': 'server:v1',
                     'detach': True,
-                    'env': [f'SERVER_ID={serv_id}'],
+                    'env': [f'SERVER_ID={serv_id}',
+                            'DEBUG=true'],
                     'hostname': hostname,
                 }
 
@@ -192,37 +197,40 @@ async def add():
                     }
                 })
 
-                ic(f'Created container for {hostname}')
+                print(f'CREATE | Created container for {hostname}',
+                   file=sys.stderr)
 
                 # start the container
                 await container.start()
 
                 # TODO: do error handling for container start
 
-                ic(f'Started container for {hostname}')
-
-                # await docker.close()
+                print(f'SPAWN | Started container for {hostname}',
+                   file=sys.stderr)
 
                 await asyncio.sleep(0)
 
             # END for
 
+            # close docker session
+            await docker.close()
+
             # this also should be locked
             ic(replicas.getServerList())
 
             # Return the response payload
-            return jsonify({
+            return jsonify(ic({
                 'message': {
                     'N': len(replicas),
                     'replicas': replicas.getServerList()
                 },
                 'status': 'success'
-            }), 200
+            })), 200
 
         # END async with lock
 
     except Exception as e:
-        return jsonify(err_payload(e)), 400
+        return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END add
 
@@ -307,7 +315,10 @@ async def delete():
             # Add the random hostnames to the list of hostnames to delete
             hostnames.extend(random_hostnames)
 
-            ic("To delete:", hostnames)
+            ic("To delete: ", hostnames)
+
+            # Get Docker client
+            docker = aiodocker.Docker()
 
             # Delete the hostnames from the list
             for hostname in hostnames:
@@ -324,7 +335,8 @@ async def delete():
 
                 # TODO: do error handling for container stop and delete
 
-                ic(f'Deleted container for {hostname}')
+                print(f'REMOVE | Deleted container for {hostname}',
+                   file=sys.stderr)
 
                 # await docker.close()
 
@@ -332,22 +344,25 @@ async def delete():
 
             # END for
 
+            # close docker session
+            await docker.close()
+
             # this also should be locked
             ic(replicas.getServerList())
 
             # Return the response payload
-            return jsonify({
+            return jsonify(ic({
                 'message': {
                     'N': len(replicas),
                     'replicas': replicas.getServerList()
                 },
                 'status': 'success'
-            }), 200
+            })), 200
 
         # END async with lock
 
     except Exception as e:
-        return jsonify(err_payload(e)), 400
+        return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END delete
 
@@ -376,6 +391,7 @@ async def home():
         # Get the request payload
         payload: dict = await request.get_json()
         ic(payload)
+
         request_id = int(payload.get("request_id", -1))
 
         server_name = None
@@ -386,7 +402,8 @@ async def home():
             raise Exception('No servers are available')
 
         # Send the request to the server asynchronously
-        serv_request = grequests.get(f'http://{server_name}:5000/home', timeout=REQUEST_TIMEOUT)
+        serv_request = grequests.get(f'http://{server_name}:5000/home',
+                                     timeout=REQUEST_TIMEOUT)
 
         # async stuff happens here (I think lol)
         serv_response = grequests.map([serv_request])[0]
@@ -397,10 +414,10 @@ async def home():
         if serv_response is None:
             raise Exception('Server did not respond')
 
-        return jsonify(serv_response.json()), 200
+        return jsonify(ic(serv_response.json())), 200
 
     except Exception as e:
-        return jsonify(err_payload(e)), 400
+        return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END home
 
@@ -484,7 +501,10 @@ async def handle_flatline(server_name: str):
     Handles the flatline of a server replica.
     """
 
-    ic(f'Flatline of server replica `{server_name}` detected')
+    print(f'FLATLINE | Flatline of server replica `{server_name}` detected', file=sys.stderr)
+
+    # Get Docker client
+    docker = aiodocker.Docker()
 
     # TODO: respawn the server replica using docker
     container = await docker.containers.get(server_name)
@@ -493,9 +513,10 @@ async def handle_flatline(server_name: str):
 
     # TODO: do error handling for container restart
 
-    ic(f'Restarted container for {server_name}')
+    print(f'RESTART | Restarted container for {server_name}', file=sys.stderr)
 
-    # await docker.close()
+    # close docker session
+    await docker.close()
 
     await asyncio.sleep(0)
 
