@@ -50,9 +50,6 @@ REQUEST_BATCH_SIZE = 10
 # number of docker tasks to perform in a batch
 DOCKER_TASK_BATCH_SIZE = 10
 
-# async stuff is crazy so we need this
-loop = asyncio.get_event_loop()
-
 
 @app.route('/rep', methods=['GET'])
 async def rep():
@@ -662,5 +659,4 @@ if __name__ == '__main__':
 
     # Run the server
     app.run(host='0.0.0.0', port=port,
-            use_reloader=False, loop=loop,
-            debug=DEBUG)
+            use_reloader=False, debug=DEBUG)
