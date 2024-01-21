@@ -23,7 +23,7 @@ def random_hostname():
     Generate a random hostname.
     """
 
-    return f'Server-{random.randrange(0, 1000):04}-{int(time.time()*1e3) % 1000:03}'
+    return f'Server-{random.randrange(0, 1000):03}-{int(time.time()*1e3) % 1000:03}'
 # END random_hostname
 
 

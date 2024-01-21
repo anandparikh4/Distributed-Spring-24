@@ -174,46 +174,55 @@ async def add():
 
             async def spawn_container(serv_id: int, hostname: str):
                 async with semaphore:
-                    # spawn new docker containers for the new hostnames
-                    container_config = {
-                        'image': 'server:v1',
-                        'detach': True,
-                        'env': [f'SERVER_ID={serv_id}',
-                                'DEBUG=true'],
-                        'hostname': hostname,
-                    }
-
-                    # create the container
-                    container = await docker.containers.create_or_replace(
-                        name=hostname,
-                        config=container_config,
-                    )
-
-                    # Attach the container to the network and set the alias
-                    my_net = await docker.networks.get('my_net')
-                    await my_net.connect({
-                        'Container': container.id,
-                        'EndpointConfig': {
-                            'Aliases': [hostname]
+                    try:
+                        # spawn new docker containers for the new hostnames
+                        container_config = {
+                            'image': 'server:v1',
+                            'detach': True,
+                            'env': [f'SERVER_ID={serv_id}',
+                                    'DEBUG=true'],
+                            'hostname': hostname,
                         }
-                    })
 
-                    if DEBUG:
-                        print(Fore.GREEN + 'CREATE | ' + Style.RESET_ALL +
-                              f'Created container for {hostname}',
-                              file=sys.stderr)
+                        # create the container
+                        container = await docker.containers.create_or_replace(
+                            name=hostname,
+                            config=container_config,
+                        )
 
-                    # start the container
-                    await container.start()
+                        # Attach the container to the network and set the alias
+                        my_net = await docker.networks.get('my_net')
+                        await my_net.connect({
+                            'Container': container.id,
+                            'EndpointConfig': {
+                                'Aliases': [hostname]
+                            }
+                        })
 
-                    # TODO: do error handling for container start
+                        if DEBUG:
+                            print(f'{Fore.GREEN}CREATE | '
+                                  f'Created container for {hostname}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
 
-                    if DEBUG:
-                        print(Fore.MAGENTA + 'SPAWN | ' + Style.RESET_ALL +
-                              f'Started container for {hostname}',
-                              file=sys.stderr)
+                        # start the container
+                        await container.start()
 
-                    await asyncio.sleep(0)
+                        if DEBUG:
+                            print(f'{Fore.MAGENTA}SPAWN | '
+                                  f'Started container for {hostname}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
+
+                        await asyncio.sleep(0)
+
+                    except Exception as e:
+                        if DEBUG:
+                            print(f'{Fore.RED}ERROR | '
+                                  f'{e}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
+                    # END try-except
                 # END async with semaphore
             # END spawn_container
 
@@ -234,16 +243,12 @@ async def add():
             # END for
 
             # Wait for all tasks to complete
-            ret = await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
             await asyncio.sleep(0)
 
             # close docker session
             await docker.close()
-
-            # check if any errors occured
-            if any(ret):
-                raise Exception(f'Error while spawning containers: {ret}')
 
             # this also should be locked
             ic(replicas.getServerList())
@@ -261,8 +266,11 @@ async def add():
 
     except Exception as e:
         if DEBUG:
-            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
                   file=sys.stderr)
+
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END add
@@ -360,20 +368,29 @@ async def delete():
 
             async def stop_container(hostname: str):
                 async with semaphore:
-                    # stop docker containers for the deleted hostnames
-                    container = await docker.containers.get(hostname)
+                    try:
+                        # stop docker containers for the deleted hostnames
+                        container = await docker.containers.get(hostname)
 
-                    await container.stop(timeout=STOP_TIMEOUT)
-                    await container.delete(force=True)
+                        await container.stop(timeout=STOP_TIMEOUT)
+                        await container.delete(force=True)
 
-                    # TODO: do error handling for container stop and delete
+                        # TODO: do error handling for container stop and delete
 
-                    if DEBUG:
-                        print(Fore.YELLOW + 'REMOVE | ' + Style.RESET_ALL +
-                              f'Deleted container for {hostname}',
-                              file=sys.stderr)
+                        if DEBUG:
+                            print(f'{Fore.YELLOW}REMOVE | '
+                                  f'Deleted container for {hostname}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
 
-                    await asyncio.sleep(0)
+                        await asyncio.sleep(0)
+                    except Exception as e:
+                        if DEBUG:
+                            print(f'{Fore.RED}ERROR | '
+                                  f'{e}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
+                    # END try-except
                 # END async with semaphore
             # END stop_container
 
@@ -418,7 +435,9 @@ async def delete():
 
     except Exception as e:
         if DEBUG:
-            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
                   file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
     # END try-except
@@ -454,7 +473,6 @@ async def home():
 
         request_id = int(payload.get("request_id", -1))
 
-        server_name = None
         async with lock(Read):
             server_name = replicas.find(request_id)
 
@@ -479,7 +497,9 @@ async def home():
 
     except Exception as e:
         if DEBUG:
-            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
                   file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
     # END try-except
@@ -542,7 +562,9 @@ async def my_shutdown():
                 await container.delete(force=True)
             except Exception as e:
                 if DEBUG:
-                    print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                    print(f'{Fore.RED}ERROR | '
+                          f'{e}'
+                          f'{Style.RESET_ALL}',
                           file=sys.stderr)
             # END try-except
 
@@ -570,8 +592,9 @@ async def get_heartbeats():
     global heartbeat_fail_count
 
     if DEBUG:
-        print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
-              'Heartbeat background task started',
+        print(f'{Fore.CYAN}HEARTBEAT | '
+              'Heartbeat background task started'
+              f'{Style.RESET_ALL}',
               file=sys.stderr)
 
     try:
@@ -579,12 +602,13 @@ async def get_heartbeats():
             # check heartbeat every `HEARTBEAT_INTERVAL` seconds
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
-            if DEBUG:
-                print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
-                      'Checking heartbeat',
-                      file=sys.stderr)
-
             async with lock(Read):
+                if DEBUG:
+                    print(f'{Fore.CYAN}HEARTBEAT | '
+                          f'Checking heartbeat every {HEARTBEAT_INTERVAL} seconds'
+                          f'{Style.RESET_ALL}',
+                          file=sys.stderr)
+
                 # Get the list of server replica hostnames
                 hostnames = replicas.getServerList().copy()
             # END async with lock(Read)
@@ -603,6 +627,22 @@ async def get_heartbeats():
             # To allow other tasks to run
             await asyncio.sleep(0)
 
+            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+
+            async def wrapper(server_name):
+                async with semaphore:
+                    try:
+                        await handle_flatline(server_name)
+                    except Exception as e:
+                        if DEBUG:
+                            print(f'{Fore.RED}ERROR | '
+                                  f'{e}'
+                                  f'{Style.RESET_ALL}',
+                                  file=sys.stderr)
+                    # END try-except
+                # END async with semaphore
+            # END wrapper
+
             flatlines = []
 
             async with lock(Write):
@@ -614,7 +654,7 @@ async def get_heartbeats():
 
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                            flatlines.append(hostnames[i])
+                            flatlines.append(wrapper(hostnames[i]))
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0
@@ -622,19 +662,6 @@ async def get_heartbeats():
                 # END for
 
                 ic(heartbeat_fail_count)
-                ic(flatlines)
-
-                semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-                async def wrapper(server_name):
-                    async with semaphore:
-                        await handle_flatline(server_name)
-                        await asyncio.sleep(0)
-                    # END async with semaphore
-                # END wrapper
-
-                flatlines = [wrapper(server_name)
-                             for server_name in flatlines]
 
                 await asyncio.gather(*flatlines, return_exceptions=True)
                 await asyncio.sleep(0)
@@ -643,8 +670,9 @@ async def get_heartbeats():
         # END while
     except asyncio.CancelledError:
         if DEBUG:
-            print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
-                  'Heartbeat background task stopped',
+            print(f'{Fore.CYAN}HEARTBEAT | '
+                  'Heartbeat background task stopped'
+                  f'{Style.RESET_ALL}',
                   file=sys.stderr)
 # END get_heartbeats
 
@@ -655,8 +683,9 @@ async def handle_flatline(server_name: str):
     """
 
     if DEBUG:
-        print(Fore.LIGHTRED_EX + 'FLATLINE | ' + Style.RESET_ALL +
-              f'Flatline of server replica `{server_name}` detected',
+        print(f'{Fore.LIGHTRED_EX}FLATLINE | '
+              f'Flatline of server replica `{server_name}` detected'
+              f'{Style.RESET_ALL}',
               file=sys.stderr)
 
     # Get Docker client
@@ -670,8 +699,9 @@ async def handle_flatline(server_name: str):
     # TODO: do error handling for container restart
 
     if DEBUG:
-        print(Fore.WHITE + 'RESTART | ' + Style.RESET_ALL +
-              f'Restarted container for {server_name}',
+        print(f'{Fore.WHITE}RESTART | '
+              f'Restarted container for {server_name}'
+              f'{Style.RESET_ALL}',
               file=sys.stderr)
 
     # close docker session
