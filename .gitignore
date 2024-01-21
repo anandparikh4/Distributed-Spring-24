@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 
 # VS Code IDE configuration files
-**/.vscode/*
+.vscode/
