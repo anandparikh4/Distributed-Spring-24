@@ -10,4 +10,4 @@ print(ds.servers)
 
 print("Slots:")
 for idx in range(len(ds.slots)):
-    print(idx , ds.slots[idx])
+    print(f'{idx:>3}: {ds.slots[idx]}')

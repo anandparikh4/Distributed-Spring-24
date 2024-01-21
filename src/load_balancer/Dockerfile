@@ -19,7 +19,8 @@ COPY --from=builder /wheels /wheels
 COPY --from=builder /requirements.txt .
 
 # Install the dependencies from the wheels
-RUN pip install --no-cache-dir --no-index --find-links /wheels --requirement requirements.txt
+RUN pip install --upgrade pip && \
+	pip install --no-cache-dir --no-index --find-links /wheels --requirement requirements.txt
 
 # Remove the wheels and apk cache
 RUN rm -rf /wheels /requirements.txt

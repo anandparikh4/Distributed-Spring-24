@@ -93,7 +93,7 @@ async def add():
         Return an error message.
     If `n > remaining slots`:
         Return an error message.
-    If `hostname` already exists in `replicas`:
+    If `hostname` in `hostnames` already exists in `replicas`:
         Do not add any replicas to the list.
         Return an error message.
 
@@ -231,11 +231,10 @@ async def add():
                 serv_id += 1
 
                 tasks.append(spawn_container(serv_id, hostname))
-
             # END for
 
             # Wait for all tasks to complete
-            ret = await my_gather(*tasks, return_exceptions=True)
+            ret = await asyncio.gather(*tasks, return_exceptions=True)
 
             await asyncio.sleep(0)
 
@@ -392,7 +391,7 @@ async def delete():
             # END for
 
             # Wait for all tasks to complete
-            ret = await my_gather(*tasks, return_exceptions=True)
+            ret = await asyncio.gather(*tasks, return_exceptions=True)
 
             await asyncio.sleep(0)
 
@@ -435,7 +434,7 @@ async def home():
         `request_id: id of the request`
 
     `Response payload:`
-        `message: error message`
+        `message: message from server`
         `status: status of the request`
 
     `Error payload:`
@@ -444,7 +443,6 @@ async def home():
     """
 
     global replicas
-    global heartbeat_fail_count
 
     try:
         # Get the request payload
@@ -469,6 +467,7 @@ async def home():
             serv_response = await gather_with_concurrency(
                 session, REQUEST_BATCH_SIZE, *[f'http://{server_name}:5000/home'])
             serv_response = serv_response[0]
+        # END async with
 
         # To allow other tasks to run
         await asyncio.sleep(0)
@@ -532,17 +531,28 @@ async def my_shutdown():
     docker = aiodocker.Docker()
 
     # Stop all server replicas
-    for server_name in replicas.getServerList():
-        try:
-            container = await docker.containers.get(server_name)
+    semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            await container.stop(timeout=STOP_TIMEOUT)
-            await container.delete(force=True)
-        except Exception as e:
-            if DEBUG:
-                print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
-                      file=sys.stderr)
-    # END for
+    async def wrapper(server_name: str):
+        async with semaphore:
+            try:
+                container = await docker.containers.get(server_name)
+
+                await container.stop(timeout=STOP_TIMEOUT)
+                await container.delete(force=True)
+            except Exception as e:
+                if DEBUG:
+                    print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                          file=sys.stderr)
+            # END try-except
+
+            await asyncio.sleep(0)
+        # END async with semaphore
+    # END wrapper
+
+    tasks = [wrapper(server_name) for server_name in replicas.getServerList()]
+
+    await asyncio.gather(*tasks, return_exceptions=True)
 
     # close docker session
     await docker.close()
@@ -569,29 +579,33 @@ async def get_heartbeats():
             # check heartbeat every `HEARTBEAT_INTERVAL` seconds
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
-            async with lock(Read):
-                if DEBUG:
-                    print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
-                          'Checking heartbeat',
-                          file=sys.stderr)
+            if DEBUG:
+                print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
+                      'Checking heartbeat',
+                      file=sys.stderr)
 
+            async with lock(Read):
                 # Get the list of server replica hostnames
                 hostnames = replicas.getServerList().copy()
+            # END async with lock(Read)
 
-                heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
-                                  for server_name in hostnames]
-                heartbeats = [None] * len(hostnames)
+            # Generate heartbeat urls
+            heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
+                              for server_name in hostnames]
 
-                # Convert to aiohttp request
-                timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    heartbeats = await gather_with_concurrency(
-                        session, REQUEST_BATCH_SIZE, *heartbeat_urls)
-                # END async with
+            # Convert to aiohttp request
+            timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                heartbeats = await gather_with_concurrency(
+                    session, REQUEST_BATCH_SIZE, *heartbeat_urls)
+            # END async with session
 
-                # To allow other tasks to run
-                await asyncio.sleep(0)
+            # To allow other tasks to run
+            await asyncio.sleep(0)
 
+            flatlines = []
+
+            async with lock(Write):
                 for i, response in enumerate(heartbeats):
                     if response is None or not response.status == 200:
                         # Increment the fail count for the server replica
@@ -600,16 +614,31 @@ async def get_heartbeats():
 
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                            await handle_flatline(hostnames[i])
+                            flatlines.append(hostnames[i])
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0
                     # END if-else
-
                 # END for
 
                 ic(heartbeat_fail_count)
-            # END async with lock
+                ic(flatlines)
+
+                semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+
+                async def wrapper(server_name):
+                    async with semaphore:
+                        await handle_flatline(server_name)
+                        await asyncio.sleep(0)
+                    # END async with semaphore
+                # END wrapper
+
+                flatlines = [wrapper(server_name)
+                             for server_name in flatlines]
+
+                await asyncio.gather(*flatlines, return_exceptions=True)
+                await asyncio.sleep(0)
+            # END async with lock(Write)
 
         # END while
     except asyncio.CancelledError:

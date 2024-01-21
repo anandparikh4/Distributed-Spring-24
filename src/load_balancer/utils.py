@@ -23,7 +23,7 @@ def random_hostname():
     Generate a random hostname.
     """
 
-    return f'Server-{random.randint(0, 10000):04}-{int(time.time()*1e3) % 10000:04}'
+    return f'Server-{random.randrange(0, 1000):04}-{int(time.time()*1e3) % 1000:03}'
 # END random_hostname
 
 
@@ -37,16 +37,6 @@ def err_payload(err: Exception):
         'status': 'failure'
     }
 # END err_payload
-
-
-async def my_gather(*tasks, return_exceptions=True):
-    """
-    Gather with concurrency from aiohttp async session
-    """
-
-    res = await asyncio.gather(*tasks, return_exceptions=return_exceptions)
-    return [None if isinstance(r, BaseException) else r for r in res]
-# END gather_with_concurrency
 
 
 async def gather_with_concurrency(
@@ -66,11 +56,12 @@ async def gather_with_concurrency(
 
             async with session.get(url) as response:
                 await response.read()
+
             return response
     # END fetch
 
-    return await my_gather(*[fetch(url) for url in urls],
-                           return_exceptions=True)
-
-
+    return [None if isinstance(r, BaseException)
+            else r for r in
+            await asyncio.gather(*[fetch(url) for url in urls],
+                                 return_exceptions=True)]
 # END gather_with_concurrency
