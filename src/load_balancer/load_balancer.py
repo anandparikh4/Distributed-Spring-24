@@ -182,6 +182,7 @@ async def add():
                             'env': [f'SERVER_ID={serv_id}',
                                     'DEBUG=true'],
                             'hostname': hostname,
+                            'tty': True,
                         }
 
                         # create the container
@@ -200,7 +201,7 @@ async def add():
                         })
 
                         if DEBUG:
-                            print(f'{Fore.GREEN}CREATE | '
+                            print(f'{Fore.LIGHTGREEN_EX}CREATE | '
                                   f'Created container for {hostname}'
                                   f'{Style.RESET_ALL}',
                                   file=sys.stderr)
@@ -378,7 +379,7 @@ async def delete():
                         # TODO: do error handling for container stop and delete
 
                         if DEBUG:
-                            print(f'{Fore.YELLOW}REMOVE | '
+                            print(f'{Fore.LIGHTYELLOW_EX}REMOVE | '
                                   f'Deleted container for {hostname}'
                                   f'{Style.RESET_ALL}',
                                   file=sys.stderr)

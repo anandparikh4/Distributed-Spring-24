@@ -13,6 +13,7 @@ services:
         aliases:
           - Server-1
     hostname: Server-1
+    tty: true
     environment:
       SERVER_ID: 1
       DEBUG: "true"
@@ -26,6 +27,7 @@ services:
         aliases:
           - Server-2
     hostname: Server-2
+    tty: true
     environment:
       SERVER_ID: 2
       DEBUG: "true"
@@ -39,6 +41,7 @@ services:
         aliases:
           - Server-3
     hostname: Server-3
+    tty: true
     environment:
       SERVER_ID: 3
       DEBUG: "true"
@@ -56,9 +59,10 @@ services:
       my_net:
         aliases:
           - Load-Balancer
+    hostname: Load-Balancer
+    tty: true
     environment:
       DEBUG: "true"
-
     # Client:
     #   build: ./client
     #   image: client:v1
@@ -68,7 +72,7 @@ services:
     #       aliases:
     #         - Client
 
-# define a network my_net
+    # define a network my_net
 networks:
   my_net:
     name: my_net
