@@ -6,11 +6,14 @@ from quart import Quart, Response, jsonify
 app = Quart(__name__)
 
 SERVER_ID = os.environ.get('SERVER_ID', '0')
+DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
 ic.configureOutput(prefix=f'[Server: {SERVER_ID}] | ')
+
 # Disable icecream debug messages if DEBUG is not set to true
-if not os.environ.get('DEBUG', 'false').lower() == 'true':
+if not DEBUG:
     ic.disable()
+
 
 @app.route('/home', methods=['GET'])
 async def home():
@@ -45,5 +48,5 @@ if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
 
     # Run the server
-    app.run(host='0.0.0.0', port=port, debug=True,
-            use_reloader=False)
+    app.run(host='0.0.0.0', port=port,
+            use_reloader=False, debug=DEBUG)

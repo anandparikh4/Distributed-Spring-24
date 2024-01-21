@@ -7,6 +7,7 @@ import sys
 from fifolock import FifoLock
 from icecream import ic
 from quart import Quart, request, jsonify
+from colorama import Fore, Style
 
 from hash import ConsistentHashMap
 from utils import *
@@ -14,9 +15,12 @@ from utils import *
 app = Quart(__name__)
 lock = FifoLock()
 
-ic.configureOutput(prefix='[LB] | ',)
+DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+
+ic.configureOutput(prefix='[LB] | ')
+
 # Disable icecream debug messages if DEBUG is not set to true
-if not os.environ.get('DEBUG', 'false').lower() == 'true':
+if not DEBUG:
     ic.disable()
 
 # List to store web server replica hostnames
@@ -122,6 +126,9 @@ async def add():
         payload: dict = await request.get_json()
         ic(payload)
 
+        if payload is None:
+            raise Exception('Payload is empty')
+
         # Get the number of servers to add
         n = int(payload.get('n', -1))
 
@@ -194,16 +201,20 @@ async def add():
                         }
                     })
 
-                    print(f'CREATE | Created container for {hostname}',
-                          file=sys.stderr)
+                    if DEBUG:
+                        print(Fore.GREEN + 'CREATE | ' + Style.RESET_ALL +
+                              f'Created container for {hostname}',
+                              file=sys.stderr)
 
                     # start the container
                     await container.start()
 
                     # TODO: do error handling for container start
 
-                    print(f'SPAWN | Started container for {hostname}',
-                          file=sys.stderr)
+                    if DEBUG:
+                        print(Fore.MAGENTA + 'SPAWN | ' + Style.RESET_ALL +
+                              f'Started container for {hostname}',
+                              file=sys.stderr)
 
                     await asyncio.sleep(0)
                 # END async with semaphore
@@ -229,6 +240,8 @@ async def add():
             # Wait for all tasks to complete
             ret = await my_gather(*tasks, return_exceptions=True)
 
+            await asyncio.sleep(0)
+
             # close docker session
             await docker.close()
 
@@ -251,6 +264,9 @@ async def add():
         # END async with lock
 
     except Exception as e:
+        if DEBUG:
+            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                  file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END add
@@ -297,6 +313,9 @@ async def delete():
         # Get the request payload
         payload: dict = await request.get_json()
         ic(payload)
+
+        if payload is None:
+            raise Exception('Payload is empty')
 
         # Get the number of servers to delete
         n = int(payload.get('n', -1))
@@ -353,8 +372,10 @@ async def delete():
 
                     # TODO: do error handling for container stop and delete
 
-                    print(f'REMOVE | Deleted container for {hostname}',
-                          file=sys.stderr)
+                    if DEBUG:
+                        print(Fore.YELLOW + 'REMOVE | ' + Style.RESET_ALL +
+                              f'Deleted container for {hostname}',
+                              file=sys.stderr)
 
                     await asyncio.sleep(0)
                 # END async with semaphore
@@ -375,6 +396,8 @@ async def delete():
 
             # Wait for all tasks to complete
             ret = await my_gather(*tasks, return_exceptions=True)
+
+            await asyncio.sleep(0)
 
             # close docker session
             await docker.close()
@@ -398,6 +421,9 @@ async def delete():
         # END async with lock
 
     except Exception as e:
+        if DEBUG:
+            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                  file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END delete
@@ -428,6 +454,9 @@ async def home():
         payload: dict = await request.get_json()
         ic(payload)
 
+        if payload is None:
+            raise Exception('Payload is empty')
+
         request_id = int(payload.get("request_id", -1))
 
         server_name = None
@@ -453,6 +482,9 @@ async def home():
         return jsonify(ic(await serv_response.json())), 200
 
     except Exception as e:
+        if DEBUG:
+            print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                  file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END home
@@ -510,7 +542,9 @@ async def my_shutdown():
             await container.stop(timeout=STOP_TIMEOUT)
             await container.delete(force=True)
         except Exception as e:
-            print(f'ERROR | {e}', file=sys.stderr)
+            if DEBUG:
+                print(Fore.RED + f'ERROR | ' + Style.RESET_ALL + f'{e}',
+                      file=sys.stderr)
     # END for
 
     # close docker session
@@ -528,7 +562,10 @@ async def get_heartbeats():
     global replicas
     global heartbeat_fail_count
 
-    print('START | Heartbeat background task started', file=sys.stderr)
+    if DEBUG:
+        print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
+              'Heartbeat background task started',
+              file=sys.stderr)
 
     try:
         while True:
@@ -536,6 +573,11 @@ async def get_heartbeats():
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
             async with lock(Read):
+                if DEBUG:
+                    print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
+                          'Checking heartbeat',
+                          file=sys.stderr)
+
                 # Get the list of server replica hostnames
                 hostnames = replicas.getServerList().copy()
 
@@ -574,7 +616,10 @@ async def get_heartbeats():
 
         # END while
     except asyncio.CancelledError:
-        pass
+        if DEBUG:
+            print(Fore.CYAN + 'HEARTBEAT | ' + Style.RESET_ALL +
+                  'Heartbeat background task stopped',
+                  file=sys.stderr)
 # END get_heartbeats
 
 
@@ -583,8 +628,10 @@ async def handle_flatline(server_name: str):
     Handles the flatline of a server replica.
     """
 
-    print(
-        f'FLATLINE | Flatline of server replica `{server_name}` detected', file=sys.stderr)
+    if DEBUG:
+        print(Fore.LIGHTRED_EX + 'FLATLINE | ' + Style.RESET_ALL +
+              f'Flatline of server replica `{server_name}` detected',
+              file=sys.stderr)
 
     # Get Docker client
     docker = aiodocker.Docker()
@@ -596,7 +643,10 @@ async def handle_flatline(server_name: str):
 
     # TODO: do error handling for container restart
 
-    print(f'RESTART | Restarted container for {server_name}', file=sys.stderr)
+    if DEBUG:
+        print(Fore.WHITE + 'RESTART | ' + Style.RESET_ALL +
+              f'Restarted container for {server_name}',
+              file=sys.stderr)
 
     # close docker session
     await docker.close()
@@ -611,5 +661,6 @@ if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
 
     # Run the server
-    app.run(host='0.0.0.0', port=port, debug=True,
-            use_reloader=False, loop=loop)
+    app.run(host='0.0.0.0', port=port,
+            use_reloader=False, loop=loop,
+            debug=DEBUG)
