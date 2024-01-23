@@ -52,16 +52,17 @@ async def gather_with_concurrency(
 
     async def fetch(url: str):
         async with semaphore:
-            await asyncio.sleep(0)
-
             async with session.get(url) as response:
                 await response.read()
+
+            await asyncio.sleep(0)
 
             return response
     # END fetch
 
+    tasks = [fetch(url) for url in urls]
+
     return [None if isinstance(r, BaseException)
             else r for r in
-            await asyncio.gather(*[fetch(url) for url in urls],
-                                 return_exceptions=True)]
+            await asyncio.gather(*tasks, return_exceptions=True)]
 # END gather_with_concurrency

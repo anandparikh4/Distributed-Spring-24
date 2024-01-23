@@ -215,8 +215,6 @@ async def add():
                                   f'{Style.RESET_ALL}',
                                   file=sys.stderr)
 
-                        await asyncio.sleep(0)
-
                     except Exception as e:
                         if DEBUG:
                             print(f'{Fore.RED}ERROR | '
@@ -225,6 +223,10 @@ async def add():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
+
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
             # END spawn_container
 
             # Define tasks
@@ -246,24 +248,23 @@ async def add():
             # Wait for all tasks to complete
             await asyncio.gather(*tasks, return_exceptions=True)
 
-            await asyncio.sleep(0)
-
             # close docker session
             await docker.close()
 
-            # this also should be locked
-            ic(replicas.getServerList())
+            final_hostnames = ic(replicas.getServerList())
+        # END async with lock(Write)
 
-            # Return the response payload
-            return jsonify(ic({
-                'message': {
-                    'N': len(replicas),
-                    'replicas': replicas.getServerList()
-                },
-                'status': 'success'
-            })), 200
+        # Allow other tasks to run
+        await asyncio.sleep(0)
 
-        # END async with lock
+        # Return the response payload
+        return jsonify(ic({
+            'message': {
+                'N': len(replicas),
+                'replicas': final_hostnames
+            },
+            'status': 'success'
+        })), 200
 
     except Exception as e:
         if DEBUG:
@@ -384,7 +385,6 @@ async def delete():
                                   f'{Style.RESET_ALL}',
                                   file=sys.stderr)
 
-                        await asyncio.sleep(0)
                     except Exception as e:
                         if DEBUG:
                             print(f'{Fore.RED}ERROR | '
@@ -393,6 +393,10 @@ async def delete():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
+
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
             # END stop_container
 
             # Define tasks
@@ -411,8 +415,6 @@ async def delete():
             # Wait for all tasks to complete
             ret = await asyncio.gather(*tasks, return_exceptions=True)
 
-            await asyncio.sleep(0)
-
             # close docker session
             await docker.close()
 
@@ -420,17 +422,21 @@ async def delete():
             if any(ret):
                 raise Exception(f'Error while stopping containers: {ret}')
 
-            # this also should be locked
-            ic(replicas.getServerList())
+            final_hostnames = ic(replicas.getServerList())
 
-            # Return the response payload
-            return jsonify(ic({
-                'message': {
-                    'N': len(replicas),
-                    'replicas': replicas.getServerList()
-                },
-                'status': 'success'
-            })), 200
+        # END async with lock(Write)
+
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        # Return the response payload
+        return jsonify(ic({
+            'message': {
+                'N': len(replicas),
+                'replicas': final_hostnames
+            },
+            'status': 'success'
+        })), 200
 
         # END async with lock
 
@@ -568,9 +574,10 @@ async def my_shutdown():
                           f'{Style.RESET_ALL}',
                           file=sys.stderr)
             # END try-except
-
-            await asyncio.sleep(0)
         # END async with semaphore
+
+        # Allow other tasks to run
+        await asyncio.sleep(0)
     # END wrapper
 
     tasks = [wrapper(server_name) for server_name in replicas.getServerList()]
@@ -642,6 +649,9 @@ async def get_heartbeats():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
+
+                # To allow other tasks to run
+                await asyncio.sleep(0)
             # END wrapper
 
             flatlines = []
@@ -665,7 +675,6 @@ async def get_heartbeats():
                 ic(heartbeat_fail_count)
 
                 await asyncio.gather(*flatlines, return_exceptions=True)
-                await asyncio.sleep(0)
             # END async with lock(Write)
 
         # END while
@@ -708,6 +717,7 @@ async def handle_flatline(server_name: str):
     # close docker session
     await docker.close()
 
+    # Allow other tasks to run
     await asyncio.sleep(0)
 
 # END handle_flatline
