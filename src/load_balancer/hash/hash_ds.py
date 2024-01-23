@@ -1,11 +1,22 @@
-# tested some cryptographic hash algorithms, did not make any discernible improvements
-# import hashlib
+from typing import Callable
 
 # consistent hashing data structure
 class ConsistentHashMap:
 
     # constructor
-    def __init__(self, hostnames=None, n_slots=512, n_virtual=9):
+    def __init__(
+        self, 
+        request_hash: Callable[[int], int] = lambda i: i,
+        server_hash: Callable[[int, int], int] = lambda i, j: i + j,
+        hostnames = None, 
+        n_slots: int = 512, 
+        n_virtual: int = 9
+    ):
+
+        # assign the hash functions
+        self.requestHash = request_hash
+        self.serverHash = server_hash
+
         # map: server-name -> server-index
         self.servers: dict[str, int] = {}
 
@@ -23,30 +34,11 @@ class ConsistentHashMap:
             # populate slots
             self.add(hostname)
 
+
     # length
     def __len__(self):
         return len(self.servers)
 
-    '''
-        Note about hash functions: 
-        The coefficients are - 
-            1) Large : To cover the whole slot-space nearly uniformly with larger distance b/w virtual copies
-            2) Prime : So finally taking modulo by any slot size does not reduce randomness
-    '''
-
-    # hash function for request
-    def requestHash(self, i: int):
-        hash_int = 1427*i*i + 2503*i + 2003
-        # hash_bytes = hashlib.sha256(hash_int.to_bytes(4 , 'big')).digest()
-        # hash_int = int.from_bytes(hash_bytes , 'big')
-        return hash_int
-
-    # hash function for server
-    def serverHash(self, i: int, j: int):
-        hash_int = 1249*i*i + 2287*j*j + 1663*j + 2287
-        # hash_bytes = hashlib.sha256(hash_int.to_bytes(4 , 'big')).digest()
-        # hash_int = int.from_bytes(hash_bytes , 'big')
-        return hash_int
 
     # add a server (by hostname)
     def add(self, hostname: str):
