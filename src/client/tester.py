@@ -2,7 +2,7 @@ import sys
 import signal
 import random
 import grequests
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 from pprint import pp
 
 # %matplotlib inline
@@ -12,6 +12,8 @@ url = 'http://127.0.0.1:5000'
 endpoints = ['add', 'rm', 'rep']
 
 # clean exit on ctrl-c
+
+
 def signal_handler(sig, frame):
     print('Exiting...')
     sys.exit(0)
@@ -47,7 +49,6 @@ def main():
     requests = [grequests.get(f'{url}/home') for _ in range(500)]
     responses = grequests.map(requests)
 
-
     N = 3
     counts = {k: 0 for k in range(N+1)}
 
@@ -63,13 +64,11 @@ def main():
         counts[server_id] += 1
 
     pp(counts)
-    plt.bar(counts.keys(), counts.values())
+    plt.bar(list(counts.keys()), list(counts.values()))
     plt.savefig('plot.jpg')
 
 
-
 # END main
-
 
 if __name__ == '__main__':
     main()
