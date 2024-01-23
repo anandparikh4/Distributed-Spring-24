@@ -674,7 +674,8 @@ async def get_heartbeats():
 
                 ic(heartbeat_fail_count)
 
-                await asyncio.gather(*flatlines, return_exceptions=True)
+                if len(flatlines) > 0:
+                    await asyncio.gather(*flatlines, return_exceptions=True)
             # END async with lock(Write)
 
         # END while
