@@ -1,15 +1,17 @@
 from typing import Callable
 
 # consistent hashing data structure
+
+
 class ConsistentHashMap:
 
     # constructor
     def __init__(
-        self, 
+        self, *,
         request_hash: Callable[[int], int],
         server_hash: Callable[[int, int], int],
-        hostnames = None, 
-        n_slots: int = 512, 
+        hostnames=None,
+        n_slots: int = 512,
         n_virtual: int = 9
     ):
 
@@ -34,13 +36,13 @@ class ConsistentHashMap:
             # populate slots
             self.add(hostname)
 
-
     # length
+
     def __len__(self):
         return len(self.servers.keys())
 
-
     # add a server (by hostname)
+
     def add(self, hostname: str):
         '''
             If empty slots < n_virtual, cannot add new server: raise error

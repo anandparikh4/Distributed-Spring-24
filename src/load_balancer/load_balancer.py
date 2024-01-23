@@ -24,7 +24,9 @@ if not DEBUG:
     ic.disable()
 
 # List to store web server replica hostnames
-replicas = ConsistentHashMap(request_hash=requestHashList[1], server_hash=serverHashList[1])
+replicas = ConsistentHashMap(
+    request_hash=requestHashList[0],
+    server_hash=serverHashList[0])
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
@@ -567,6 +569,12 @@ async def my_shutdown():
 
                 await container.stop(timeout=STOP_TIMEOUT)
                 await container.delete(force=True)
+
+                if DEBUG:
+                    print(f'{Fore.LIGHTYELLOW_EX}REMOVE | '
+                          f'Deleted container for {server_name}'
+                          f'{Style.RESET_ALL}',
+                          file=sys.stderr)
             except Exception as e:
                 if DEBUG:
                     print(f'{Fore.RED}ERROR | '
