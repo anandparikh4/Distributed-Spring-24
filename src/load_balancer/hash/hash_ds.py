@@ -6,8 +6,8 @@ class ConsistentHashMap:
     # constructor
     def __init__(
         self, 
-        request_hash: Callable[[int], int] = lambda i: i,
-        server_hash: Callable[[int, int], int] = lambda i, j: i + j,
+        request_hash: Callable[[int], int],
+        server_hash: Callable[[int, int], int],
         hostnames = None, 
         n_slots: int = 512, 
         n_virtual: int = 9
@@ -37,7 +37,7 @@ class ConsistentHashMap:
 
     # length
     def __len__(self):
-        return len(self.servers)
+        return len(self.servers.keys())
 
 
     # add a server (by hostname)

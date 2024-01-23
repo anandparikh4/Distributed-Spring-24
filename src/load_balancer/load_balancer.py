@@ -9,7 +9,7 @@ from icecream import ic
 from quart import Quart, request, jsonify
 from colorama import Fore, Style
 
-from hash import ConsistentHashMap
+from hash import ConsistentHashMap, requestHashList, serverHashList
 from utils import *
 
 app = Quart(__name__)
@@ -24,7 +24,7 @@ if not DEBUG:
     ic.disable()
 
 # List to store web server replica hostnames
-replicas = ConsistentHashMap()
+replicas = ConsistentHashMap(request_hash=requestHashList[1], server_hash=serverHashList[1])
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
@@ -450,9 +450,6 @@ async def home():
     """
     Load balance the request to the server replicas.
 
-    `Request payload:`
-        `request_id: id of the request`
-
     `Response payload:`
         `message: message from server`
         `status: status of the request`
@@ -466,13 +463,16 @@ async def home():
 
     try:
         # Get the request payload
-        payload: dict = await request.get_json()
-        ic(payload)
+        # payload: dict = await request.get_json()
+        # ic(payload)
 
-        if payload is None:
-            raise Exception('Payload is empty')
+        # if payload is None:
+        #     raise Exception('Payload is empty')
 
-        request_id = int(payload.get("request_id", -1))
+        # request_id = int(payload.get("request_id", -1))
+
+        request_id = random.randint(100000, 999999)
+        ic(request_id)
 
         async with lock(Read):
             server_name = replicas.find(request_id)
