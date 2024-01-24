@@ -63,16 +63,9 @@ services:
     tty: true
     environment:
       DEBUG: "true"
-    # Client:
-    #   build: ./client
-    #   image: client:v1
-    #   container_name: Client
-    #   networks:
-    #     my_net:
-    #       aliases:
-    #         - Client
+      HASH_NUM: 2
 
-    # define a network my_net
+# define a network my_net
 networks:
   my_net:
     name: my_net

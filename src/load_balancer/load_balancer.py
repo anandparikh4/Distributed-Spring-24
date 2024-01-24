@@ -16,6 +16,7 @@ app = Quart(__name__)
 lock = FifoLock()
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+HASH_NUM = int(os.environ.get('HASH_NUM', 0))
 
 ic.configureOutput(prefix='[LB] | ')
 
@@ -25,8 +26,8 @@ if not DEBUG:
 
 # List to store web server replica hostnames
 replicas = ConsistentHashMap(
-    request_hash=requestHashList[1],
-    server_hash=serverHashList[1])
+    request_hash=requestHashList[HASH_NUM],
+    server_hash=serverHashList[HASH_NUM])
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
@@ -473,6 +474,8 @@ async def home():
 
         if server_name is None:
             raise Exception('No servers are available')
+
+        ic(server_name)
 
         async def wrapper(
             session: aiohttp.ClientSession,

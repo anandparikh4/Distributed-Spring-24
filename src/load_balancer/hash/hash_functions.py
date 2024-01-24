@@ -49,14 +49,16 @@ def serverHash2(i: int, j: int) -> int:
 
 def requestHash3(i: int) -> int:
     hash_int = i*i + 2*i + 17
-    hash_bytes = hashlib.sha256(hash_int.to_bytes(4, 'big')).digest()
+    length = (hash_int.bit_length() + 7) // 8
+    hash_bytes = hashlib.sha256(hash_int.to_bytes(length, 'big')).digest()
     hash_int = int.from_bytes(hash_bytes, 'big')
     return hash_int
 
 
 def serverHash3(i: int, j: int) -> int:
     hash_int = i*i + j*j + 2*j + 25
-    hash_bytes = hashlib.sha256(hash_int.to_bytes(4, 'big')).digest()
+    length = (hash_int.bit_length() + 7) // 8
+    hash_bytes = hashlib.sha256(hash_int.to_bytes(length, 'big')).digest()
     hash_int = int.from_bytes(hash_bytes, 'big')
     return hash_int
 

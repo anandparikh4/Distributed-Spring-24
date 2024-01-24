@@ -10,8 +10,8 @@ class ConsistentHashMap:
         self,
         request_hash: Callable[[int], int],
         server_hash: Callable[[int, int], int],
-        hostnames = None, 
-        n_slots: int = 512, 
+        hostnames=None,
+        n_slots: int = 512,
         n_virtual: int = 9,
         probing: str = 'linear'
     ):
@@ -26,6 +26,8 @@ class ConsistentHashMap:
         # slots
         self.slots: list[None | str] = [None] * n_slots
         self.n_slots = n_slots
+
+        self.probing = probing.lower()
 
         # number of virtual copies to keep
         self.n_virtual = n_virtual
@@ -42,13 +44,12 @@ class ConsistentHashMap:
         return len(self.servers.keys())
 
     # probing function
-    def probe(self, hashval: int, i: int, probing: str='linear') -> int:
-        if probing.lower() == 'quadratic':
+    def probe(self, hashval: int, i: int) -> int:
+        if self.probing == 'quadratic':
             return hashval + i*i
 
         return hashval + i
-      
-      
+
     # add a server (by hostname)
     def add(self, hostname: str):
         '''
@@ -77,7 +78,7 @@ class ConsistentHashMap:
             i = 1
             idx = server_hash
             while self.slots[idx] is not None:
-                idx = self.probe(server_hash, i, probing='quadratic')
+                idx = self.probe(server_hash, i) % self.n_slots
                 i += 1
             self.slots[idx] = hostname
 
@@ -101,7 +102,7 @@ class ConsistentHashMap:
             i = 1
             idx = server_hash
             while self.slots[idx] != hostname:
-                idx = self.probe(server_hash, i, probing='quadratic')
+                idx = self.probe(server_hash, i) % self.n_slots
                 i += 1
             self.slots[idx] = None
 
