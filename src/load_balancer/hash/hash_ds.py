@@ -10,9 +10,10 @@ class ConsistentHashMap:
         self,
         request_hash: Callable[[int], int],
         server_hash: Callable[[int, int], int],
-        hostnames=None,
-        n_slots: int = 512,
-        n_virtual: int = 9
+        hostnames = None, 
+        n_slots: int = 512, 
+        n_virtual: int = 9,
+        probing: str = 'linear'
     ):
 
         # assign the hash functions
@@ -37,12 +38,18 @@ class ConsistentHashMap:
             self.add(hostname)
 
     # length
-
     def __len__(self):
         return len(self.servers.keys())
 
-    # add a server (by hostname)
+    # probing function
+    def probe(self, hashval: int, i: int, probing: str='linear') -> int:
+        if probing.lower() == 'quadratic':
+            return hashval + i*i
 
+        return hashval + i
+      
+      
+    # add a server (by hostname)
     def add(self, hostname: str):
         '''
             If empty slots < n_virtual, cannot add new server: raise error
@@ -53,18 +60,26 @@ class ConsistentHashMap:
             raise IndexError("Insufficient slots to add new server")
         if hostname in self.servers.keys():
             raise KeyError("Hostname already present")
+
         server_idx = 0
         for value in sorted(list(self.servers.values())):
             if server_idx != value:
                 break
             server_idx += 1
         self.servers[hostname] = server_idx
+
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(
                 server_idx + 1, virtual_idx + 1)) % self.n_slots
-            while self.slots[server_hash] is not None:
-                server_hash = (server_hash + 1) % self.n_slots
-            self.slots[server_hash] = hostname
+            # Probe if there is collision
+            # while self.slots[server_hash] is not None:
+            #     server_hash = (server_hash + 1) % self.n_slots
+            i = 1
+            idx = server_hash
+            while self.slots[idx] is not None:
+                idx = self.probe(server_hash, i, probing='quadratic')
+                i += 1
+            self.slots[idx] = hostname
 
     # remove a server (by hostname)
     def remove(self, hostname: str):
@@ -76,12 +91,19 @@ class ConsistentHashMap:
             raise KeyError("Hostname not found")
         server_idx = self.servers[hostname]
         self.servers.pop(hostname)
+
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(
                 server_idx + 1, virtual_idx + 1)) % self.n_slots
-            while self.slots[server_hash] != hostname:
-                server_hash = (server_hash + 1) % self.n_slots
-            self.slots[server_hash] = None
+            # Probing if there is collision
+            # while self.slots[server_hash] != hostname:
+            #     server_hash = (server_hash + 1) % self.n_slots
+            i = 1
+            idx = server_hash
+            while self.slots[idx] != hostname:
+                idx = self.probe(server_hash, i, probing='quadratic')
+                i += 1
+            self.slots[idx] = None
 
     # find the server (by hostname) to which to route the request
     def find(self, request_id: int):
@@ -92,6 +114,7 @@ class ConsistentHashMap:
         if len(self.servers) == 0:
             raise KeyError("No servers alive")
         request_hash = (self.requestHash(request_id)) % self.n_slots
+        # Here linear probing is required since nearest server is required
         while self.slots[request_hash] is None:
             request_hash = (request_hash + 1) % self.n_slots
         return self.slots[request_hash]
