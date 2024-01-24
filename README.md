@@ -6,6 +6,20 @@
 * Ritwik Ranjan Mallik - 20CS10049
 * Anand Manojkumar Parikh - 20CS10007
 
+## Testing 
+Two python files can be used for testing the application. These are as follows:
+1. `client.py`: It is a commandline interface to send requests to the load balancer end points.
+    * `/rep`: rep
+    * `/add`: add \<count:int> [\<name:string>] ...
+    * `/rm`: del \<count:int> [\<name:string>] ...
+    * `/home`: home
+    * `/<path:path>`: \<path>
+
+1. `tester.py`: It sends 10000 requests to the load balancer and saves the bar chart plot of the number of requests sent to each server in folder `./plots`. Run it using 
+``` shell
+python tester.py <num:int> # num: the number of server replicas
+```
+
 ## Main Libraries Used
 ### Quart
 There are two major specifications for interfacing web applications with web servers: WSGI (Web Server Gateway Interface) and ASGI (Asynchronous Server Gateway Interface). WSGI is a synchronous interface, meaning that it handles one request at a time per process or thread. On the other hand, ASGI supports handling multiple requests concurrently without blocking. Since the load balancer should be able to handle as many as 10,000 concurrent requests, an web application based on WSGI such as Flask is not suitable. Rather, Quart, a framework built on top of Flask supporting ASGI servers is a better choice.
@@ -42,7 +56,7 @@ The application runs several taks asynchronously. These are:
 
 A cooperation takes place whenever there are multiple tasks to perform simultaneously. For docker related tasks such as spawning and removing a container, the set of tasks are added to to a pool and processed in batches of size `DOCKER_TASK_BATCH_SIZE`. This is done using a semaphore initialized to `DOCKER_TASK_BATCH_SIZE`. For http requests, similarly, the set of requests are processed in batches of size `REQUEST_BATCH_SIZE`. This is done using a semaphore initialized to `REQUEST_BATCH_SIZE`. Cooperation is ensured by calling `await asyncio.sleep(0)` inside a task in appropiate places, which gives other tasks a chance to run before it itself starts executing.
 
-### Docker
+### Dockerfile
 Some design choices have been made during dockerizing the application. These are as follows:
 1. The default python image is based on the Ubuntu image which installs some unnecessary packages not needed for our application. Instead, the python image based on the Alpine image is used. This image is much lighter than the earlier one.
 2. Multistage build have been used during dockerization. This is done to reduce the image sizes for the load balancer and the server as much as possible.
