@@ -110,15 +110,7 @@ def other_request(
     Send a request to the other endpoint.
     """
 
-    request_id = random.randint(100000, 999999)
-    print(request_id)
-
-    payload = {
-        'request_id': request_id
-    }
-
-    # response = requests.get(f'{url}/{endpoint}', json=payload)
-    response = requests.get(f'{url}/{endpoint}', json=payload)
+    response = requests.get(f'{url}/{endpoint}')
 
     return f'Response: {response.text}Code: {response.status_code}'
 # END other_request

@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from pprint import pp
 import asyncio
 import aiohttp
+from time import time
 
 # URL of the server
 url = 'http://127.0.0.1:5000'
@@ -57,9 +58,9 @@ async def main(server_count:int = 3):
 
     pp(counts)
     pp(sum(counts.values()))
-    plt.bar(list(counts.keys()), list(counts.values()))
-    # plt.savefig('plot.jpg')
-    plt.show()
+    # plt.bar(list(counts.keys()), list(counts.values()))
+    # plt.savefig(f'../../plots/plot-{N}-{int(time()*1e3)}.jpg')
+    # plt.show()
 
 
 # END main
