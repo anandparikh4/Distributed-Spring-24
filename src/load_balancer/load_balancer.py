@@ -1,9 +1,9 @@
-import aiodocker
 import aiohttp
 import asyncio
 import os
 import random
 import sys
+from aiodocker import Docker
 from fifolock import FifoLock
 from icecream import ic
 from quart import Quart, request, jsonify
@@ -25,8 +25,8 @@ if not DEBUG:
 
 # List to store web server replica hostnames
 replicas = ConsistentHashMap(
-    request_hash=requestHashList[0],
-    server_hash=serverHashList[0])
+    request_hash=requestHashList[1],
+    server_hash=serverHashList[1])
 
 # Map to store heartbeat fail counts for each server replica.
 heartbeat_fail_count: dict[str, int] = {}
@@ -120,6 +120,9 @@ async def add():
     global heartbeat_fail_count
     global serv_id
 
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
     try:
         # Get the request payload
         payload: dict = await request.get_json()
@@ -169,12 +172,16 @@ async def add():
 
             ic("To add: ", hostnames)
 
-            # Get Docker client
-            docker = aiodocker.Docker()
-
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def spawn_container(serv_id: int, hostname: str):
+            async def spawn_container(
+                docker: Docker,
+                serv_id: int,
+                hostname: str
+            ):
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
                 async with semaphore:
                     try:
                         # spawn new docker containers for the new hostnames
@@ -225,39 +232,31 @@ async def add():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
-
-                # Allow other tasks to run
-                await asyncio.sleep(0)
-
             # END spawn_container
 
-            # Define tasks
-            tasks = []
+            async with Docker() as docker:
+                # Define tasks
+                tasks = []
 
-            # Add the hostnames to the list
-            for hostname in hostnames:
-                replicas.add(hostname)
+                # Add the hostnames to the list
+                for hostname in hostnames:
+                    replicas.add(hostname)
 
-                # Edit the flatline map
-                heartbeat_fail_count[hostname] = 0
+                    # Edit the flatline map
+                    heartbeat_fail_count[hostname] = 0
 
-                # increment server id
-                serv_id += 1
+                    # increment server id
+                    serv_id += 1
 
-                tasks.append(spawn_container(serv_id, hostname))
-            # END for
+                    tasks.append(spawn_container(docker, serv_id, hostname))
+                # END for
 
-            # Wait for all tasks to complete
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-            # close docker session
-            await docker.close()
+                # Wait for all tasks to complete
+                await asyncio.gather(*tasks, return_exceptions=True)
+            # END async with Docker
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)
-
-        # Allow other tasks to run
-        await asyncio.sleep(0)
 
         # Return the response payload
         return jsonify(ic({
@@ -317,6 +316,9 @@ async def delete():
     global replicas
     global heartbeat_fail_count
 
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
     try:
         # Get the request payload
         payload: dict = await request.get_json()
@@ -365,12 +367,15 @@ async def delete():
 
             ic("To delete: ", hostnames)
 
-            # Get Docker client
-            docker = aiodocker.Docker()
-
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def stop_container(hostname: str):
+            async def stop_container(
+                docker: Docker,
+                hostname: str
+            ):
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
                 async with semaphore:
                     try:
                         # stop docker containers for the deleted hostnames
@@ -378,8 +383,6 @@ async def delete():
 
                         await container.stop(timeout=STOP_TIMEOUT)
                         await container.delete(force=True)
-
-                        # TODO: do error handling for container stop and delete
 
                         if DEBUG:
                             print(f'{Fore.LIGHTYELLOW_EX}REMOVE | '
@@ -395,41 +398,28 @@ async def delete():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
-
-                # Allow other tasks to run
-                await asyncio.sleep(0)
-
             # END stop_container
 
-            # Define tasks
-            tasks = []
+            async with Docker() as docker:
+                # Define tasks
+                tasks = []
 
-            # Delete the hostnames from the list
-            for hostname in hostnames:
-                replicas.remove(hostname)
+                # Delete the hostnames from the list
+                for hostname in hostnames:
+                    replicas.remove(hostname)
 
-                # Edit the flatline map
-                heartbeat_fail_count.pop(hostname, None)
+                    # Edit the flatline map
+                    heartbeat_fail_count.pop(hostname, None)
 
-                tasks.append(stop_container(hostname))
-            # END for
+                    tasks.append(stop_container(docker, hostname))
+                # END for
 
-            # Wait for all tasks to complete
-            ret = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # close docker session
-            await docker.close()
-
-            # check if any errors occured
-            if any(ret):
-                raise Exception(f'Error while stopping containers: {ret}')
+                # Wait for all tasks to complete
+                await asyncio.gather(*tasks, return_exceptions=True)
+            # END async with Docker
 
             final_hostnames = ic(replicas.getServerList())
-
         # END async with lock(Write)
-
-        # Allow other tasks to run
-        await asyncio.sleep(0)
 
         # Return the response payload
         return jsonify(ic({
@@ -448,6 +438,7 @@ async def delete():
                   f'{e}'
                   f'{Style.RESET_ALL}',
                   file=sys.stderr)
+
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END delete
@@ -469,16 +460,11 @@ async def home():
 
     global replicas
 
+    # To allow other tasks to run
+    await asyncio.sleep(0)
+
     try:
-        # Get the request payload
-        # payload: dict = await request.get_json()
-        # ic(payload)
-
-        # if payload is None:
-        #     raise Exception('Payload is empty')
-
-        # request_id = int(payload.get("request_id", -1))
-
+        # Generate a random request id
         request_id = random.randint(100000, 999999)
         ic(request_id)
 
@@ -488,16 +474,27 @@ async def home():
         if server_name is None:
             raise Exception('No servers are available')
 
+        async def wrapper(
+            session: aiohttp.ClientSession,
+            server_name: str
+        ):
+            # To allow other tasks to run
+            await asyncio.sleep(0)
+
+            async with session.get(f'http://{server_name}:5000/home') as response:
+                await response.read()
+
+            return response
+        # END wrapper
+
         # Convert to aiohttp request
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            serv_response = await gather_with_concurrency(
-                session, REQUEST_BATCH_SIZE, *[f'http://{server_name}:5000/home'])
-            serv_response = serv_response[0]
+            tasks = [asyncio.create_task(wrapper(session, server_name))]
+            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+            serv_response = serv_response[0] if not isinstance(
+                serv_response[0], BaseException) else None
         # END async with
-
-        # To allow other tasks to run
-        await asyncio.sleep(0)
 
         if serv_response is None:
             raise Exception('Server did not respond')
@@ -510,6 +507,7 @@ async def home():
                   f'{e}'
                   f'{Style.RESET_ALL}',
                   file=sys.stderr)
+
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END home
@@ -538,9 +536,6 @@ async def my_startup():
 
     # Register the heartbeat background task
     app.add_background_task(get_heartbeats)
-
-    # To allow other tasks to run
-    await asyncio.sleep(0)
 # END my_startup
 
 
@@ -556,13 +551,16 @@ async def my_shutdown():
     # Stop the heartbeat background task
     app.background_tasks.pop().cancel()
 
-    # Get Docker client
-    docker = aiodocker.Docker()
-
     # Stop all server replicas
     semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-    async def wrapper(server_name: str):
+    async def wrapper(
+        docker: Docker,
+        server_name: str
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
         async with semaphore:
             try:
                 container = await docker.containers.get(server_name)
@@ -583,18 +581,13 @@ async def my_shutdown():
                           file=sys.stderr)
             # END try-except
         # END async with semaphore
-
-        # Allow other tasks to run
-        await asyncio.sleep(0)
     # END wrapper
 
-    tasks = [wrapper(server_name) for server_name in replicas.getServerList()]
-
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-    # close docker session
-    await docker.close()
-
+    async with Docker() as docker:
+        tasks = [wrapper(docker, server_name)
+                 for server_name in replicas.getServerList()]
+        await asyncio.gather(*tasks, return_exceptions=True)
+    # END async with Docker
 # END my_shutdown
 
 
@@ -645,7 +638,10 @@ async def get_heartbeats():
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def wrapper(server_name):
+            async def wrapper(server_name: str):
+                # To allow other tasks to run
+                await asyncio.sleep(0)
+
                 async with semaphore:
                     try:
                         await handle_flatline(server_name)
@@ -657,9 +653,6 @@ async def get_heartbeats():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
-
-                # To allow other tasks to run
-                await asyncio.sleep(0)
             # END wrapper
 
             flatlines = []
@@ -681,18 +674,20 @@ async def get_heartbeats():
                 # END for
 
                 ic(heartbeat_fail_count)
-
-                if len(flatlines) > 0:
-                    await asyncio.gather(*flatlines, return_exceptions=True)
             # END async with lock(Write)
 
+            # Don't gather with lock held for optimization
+            if len(flatlines) > 0:
+                await asyncio.gather(*flatlines, return_exceptions=True)
         # END while
+
     except asyncio.CancelledError:
         if DEBUG:
             print(f'{Fore.CYAN}HEARTBEAT | '
                   'Heartbeat background task stopped'
                   f'{Style.RESET_ALL}',
                   file=sys.stderr)
+    # END try-except
 # END get_heartbeats
 
 
@@ -701,34 +696,36 @@ async def handle_flatline(server_name: str):
     Handles the flatline of a server replica.
     """
 
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
     if DEBUG:
         print(f'{Fore.LIGHTRED_EX}FLATLINE | '
               f'Flatline of server replica `{server_name}` detected'
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 
-    # Get Docker client
-    docker = aiodocker.Docker()
+    try:
+        async with Docker() as docker:
+            # respawn the server replica using docker
+            container = await docker.containers.get(server_name)
 
-    # respawn the server replica using docker
-    container = await docker.containers.get(server_name)
+            await container.restart(timeout=STOP_TIMEOUT)
+        # END async with docker
 
-    await container.restart(timeout=STOP_TIMEOUT)
+        if DEBUG:
+            print(f'{Fore.WHITE}RESTART | '
+                  f'Restarted container for {server_name}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
 
-    # TODO: do error handling for container restart
-
-    if DEBUG:
-        print(f'{Fore.WHITE}RESTART | '
-              f'Restarted container for {server_name}'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
-
-    # close docker session
-    await docker.close()
-
-    # Allow other tasks to run
-    await asyncio.sleep(0)
-
+    except Exception as e:
+        if DEBUG:
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
+    # END try-except
 # END handle_flatline
 
 

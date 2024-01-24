@@ -48,16 +48,21 @@ async def gather_with_concurrency(
     Gather with concurrency from aiohttp async session
     """
 
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
     semaphore = asyncio.Semaphore(batch)
 
     async def fetch(url: str):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
         async with semaphore:
             async with session.get(url) as response:
                 await response.read()
 
-            await asyncio.sleep(0)
-
             return response
+        # END async with semaphore
     # END fetch
 
     tasks = [fetch(url) for url in urls]

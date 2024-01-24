@@ -7,7 +7,7 @@ class ConsistentHashMap:
 
     # constructor
     def __init__(
-        self, *,
+        self,
         request_hash: Callable[[int], int],
         server_hash: Callable[[int, int], int],
         hostnames=None,
