@@ -1,11 +1,13 @@
 from typing import Callable
 
 # consistent hashing data structure
+
+
 class ConsistentHashMap:
 
     # constructor
     def __init__(
-        self, 
+        self,
         request_hash: Callable[[int], int],
         server_hash: Callable[[int, int], int],
         hostnames = None, 
@@ -35,7 +37,6 @@ class ConsistentHashMap:
             # populate slots
             self.add(hostname)
 
-
     # length
     def __len__(self):
         return len(self.servers.keys())
@@ -45,8 +46,9 @@ class ConsistentHashMap:
         if probing.lower() == 'quadratic':
             return hashval + i*i
 
-        return hashval + i*i
-
+        return hashval + i
+      
+      
     # add a server (by hostname)
     def add(self, hostname: str):
         '''

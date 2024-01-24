@@ -6,9 +6,10 @@ from quart import Quart, Response, jsonify
 app = Quart(__name__)
 
 SERVER_ID = os.environ.get('SERVER_ID', '0')
+HOSTNAME = os.environ.get('HOSTNAME', 'localhost')
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
-ic.configureOutput(prefix=f'[Server: {SERVER_ID}] | ')
+ic.configureOutput(prefix=f'[{HOSTNAME}: {SERVER_ID}] | ')
 
 # Disable icecream debug messages if DEBUG is not set to true
 if not DEBUG:

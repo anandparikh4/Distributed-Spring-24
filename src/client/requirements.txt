@@ -1,1 +1,2 @@
-grequests==0.7.0
+aiohttp==3.9.1
+matplotlib==3.8.2
