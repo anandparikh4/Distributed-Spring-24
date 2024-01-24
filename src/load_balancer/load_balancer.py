@@ -370,7 +370,7 @@ async def delete():
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def stop_container(
+            async def remove_container(
                 docker: Docker,
                 hostname: str
             ):
@@ -412,7 +412,7 @@ async def delete():
                     # Edit the flatline map
                     heartbeat_fail_count.pop(hostname, None)
 
-                    tasks.append(stop_container(docker, hostname))
+                    tasks.append(remove_container(docker, hostname))
                 # END for
 
                 # Wait for all tasks to complete
@@ -602,6 +602,7 @@ async def get_heartbeats():
 
     global replicas
     global heartbeat_fail_count
+    global serv_id
 
     if DEBUG:
         print(f'{Fore.CYAN}HEARTBEAT | '
@@ -641,13 +642,16 @@ async def get_heartbeats():
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def wrapper(server_name: str):
+            async def wrapper(
+                serv_id: int,
+                server_name: str
+            ):
                 # To allow other tasks to run
                 await asyncio.sleep(0)
 
                 async with semaphore:
                     try:
-                        await handle_flatline(server_name)
+                        await handle_flatline(serv_id, server_name)
                     except Exception as e:
                         if DEBUG:
                             print(f'{Fore.RED}ERROR | '
@@ -669,7 +673,8 @@ async def get_heartbeats():
 
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                            flatlines.append(wrapper(hostnames[i]))
+                            serv_id += 1
+                            flatlines.append(wrapper(serv_id, hostnames[i]))
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0
@@ -677,11 +682,11 @@ async def get_heartbeats():
                 # END for
 
                 ic(heartbeat_fail_count)
-            # END async with lock(Write)
 
-            # Don't gather with lock held for optimization
-            if len(flatlines) > 0:
-                await asyncio.gather(*flatlines, return_exceptions=True)
+                # Don't gather with lock held for optimization
+                if len(flatlines) > 0:
+                    await asyncio.gather(*flatlines, return_exceptions=True)
+            # END async with lock(Write)
         # END while
 
     except asyncio.CancelledError:
@@ -694,7 +699,10 @@ async def get_heartbeats():
 # END get_heartbeats
 
 
-async def handle_flatline(server_name: str):
+async def handle_flatline(
+    serv_id: int,
+    hostname: str
+):
     """
     Handles the flatline of a server replica.
     """
@@ -704,23 +712,52 @@ async def handle_flatline(server_name: str):
 
     if DEBUG:
         print(f'{Fore.LIGHTRED_EX}FLATLINE | '
-              f'Flatline of server replica `{server_name}` detected'
+              f'Flatline of server replica `{hostname}` detected'
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 
     try:
         async with Docker() as docker:
-            # respawn the server replica using docker
-            container = await docker.containers.get(server_name)
+            container_config = {
+                'image': 'server:v1',
+                'detach': True,
+                'env': [f'SERVER_ID={serv_id}',
+                        'DEBUG=true'],
+                'hostname': hostname,
+                'tty': True,
+            }
 
-            await container.restart(timeout=STOP_TIMEOUT)
+            # create the container
+            container = await docker.containers.create_or_replace(
+                name=hostname,
+                config=container_config,
+            )
+
+            # Attach the container to the network and set the alias
+            my_net = await docker.networks.get('my_net')
+
+            await my_net.connect({
+                'Container': container.id,
+                'EndpointConfig': {
+                    'Aliases': [hostname]
+                }
+            })
+
+            if DEBUG:
+                print(f'{Fore.LIGHTGREEN_EX}RECREATE | '
+                      f'Created container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
+
+            # start the container
+            await container.start()
+
+            if DEBUG:
+                print(f'{Fore.MAGENTA}RESPAWN | '
+                      f'Started container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
         # END async with docker
-
-        if DEBUG:
-            print(f'{Fore.WHITE}RESTART | '
-                  f'Restarted container for {server_name}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
 
     except Exception as e:
         if DEBUG:
