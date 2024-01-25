@@ -48,7 +48,7 @@ In python, asyncio is a library to write concurrent code using async/await synta
 ### [aiohttp](https://docs.aiohttp.org/en/stable/)
 The aiohttp library is used for bulilding asynchronous HTTP client/server for asyncio and Python. It supports both Server WebSockets and Client WebSockets. 
 
-### [aiodocker](https://github.com/aio-libs/aiodocker)
+### [aiodocker](https://aiodocker.readthedocs.io/en/latest/)
 The aiodocker library is a simple docker HTTP API wrapper written with asyncio and aiohttp. Rather than making system calls inside the load balancer to perform docker related tasking like adding or removing server containers, aiodocker exposes functions with loads of flexibilities to perform these tasks.
 
 ### [fifolock](https://github.com/michalc/fifolock)
