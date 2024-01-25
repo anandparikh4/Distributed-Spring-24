@@ -610,11 +610,10 @@ async def get_heartbeats():
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 
+    await asyncio.sleep(0)
+
     try:
         while True:
-            # check heartbeat every `HEARTBEAT_INTERVAL` seconds
-            await asyncio.sleep(HEARTBEAT_INTERVAL)
-
             async with lock(Read):
                 if DEBUG:
                     print(f'{Fore.CYAN}HEARTBEAT | '
@@ -687,6 +686,9 @@ async def get_heartbeats():
                 if len(flatlines) > 0:
                     await asyncio.gather(*flatlines, return_exceptions=True)
             # END async with lock(Write)
+
+            # check heartbeat every `HEARTBEAT_INTERVAL` seconds
+            await asyncio.sleep(HEARTBEAT_INTERVAL)
         # END while
 
     except asyncio.CancelledError:
