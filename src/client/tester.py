@@ -58,8 +58,8 @@ async def main(server_count:int = 3):
 
     pp(counts)
     pp(sum(counts.values()))
-    # plt.bar(list(counts.keys()), list(counts.values()))
-    # plt.savefig(f'../../plots/plot-{N}-{int(time()*1e3)}.jpg')
+    plt.bar(list(counts.keys()), list(counts.values()))
+    plt.savefig(f'../../plots/plot-{N}-{int(time()*1e3)}.jpg')
     # plt.show()
 
 

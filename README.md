@@ -27,7 +27,20 @@ Two python files can be used for testing the application. These are as follows:
     ```
 
 ## Analysis
-The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server replicas. The bar chart below plots the standard deviation of the number of requests sent to each server.
+### A-1
+The load balancer is tested for 10000 requests with N = 3 servers. The distribution of requests among the 3 servers is shown by the following bar charts. These are generated using `tester.py`.
+
+#### With Given Hash Function:
+![](./plots/plot-3-0.jpg)
+
+#### With Modified Hash Function:
+![](./plots/plot-3-1.jpg)
+
+#### With Cryptographic Hash Function:
+![](./plots/plot-3-2.jpg)
+
+### A-2
+The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server replicas. The line charts below plot the standard deviation of the number of requests sent to each server.
 
 #### With Given Hash Function:
 ![](./plots/SD-0.jpg)
@@ -37,6 +50,11 @@ The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server repl
 
 #### With Cryptographic Hash Function:
 ![](./plots/SD-2.jpg)
+
+### A-3
+The load balancer is tested for all the endpoints and the corresponding logs of both the server side and the client side are given below. This testing is done using `client.py`.
+![](./plots/rep-req.png) ![](./plots/rep-res.png)
+
 
 ## Main Libraries Used
 ### [Quart](https://pgjones.gitlab.io/quart/)
