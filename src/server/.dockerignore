@@ -161,3 +161,8 @@ cython_debug/
 
 # VS Code IDE configuration files
 .vscode/
+
+# Docker Stuff
+Dockerfile
+.dockerignore
+
