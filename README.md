@@ -53,8 +53,52 @@ The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server repl
 
 ### A-3
 The load balancer is tested for all the endpoints and the corresponding logs of both the server side and the client side are given below. This testing is done using `client.py`.
-![](./plots/rep-req.png) ![](./plots/rep-res.png)
+* `rep`
+    * [Client-side](./plots/rep-req.png) 
+    * [Server-side](./plots/rep-res.png)
 
+* `add` normal
+    * [Client-side](./plots/add-req.png) 
+    * [Server-side](./plots/add-res.png)
+
+* `add` faulty
+    * [Client-side](./plots/add-faulty-req.png) 
+    * [Server-side](./plots/add-faulty-res.png)
+
+* `del` normal
+    * [Client-side](./plots/del-req.png) 
+    * [Server-side](./plots/del-res.png)
+
+* `del` faulty
+    * [Client-side](./plots/del-faulty-req.png) 
+    * [Server-side](./plots/del-faulty-res.png)
+
+* `home` 
+    * [Client-side](./plots/home-req.png) 
+    * [Server-side](./plots/home-res.png)
+
+* `other`
+    * [Client-side](./plots/oth-req.png) 
+    * [Server-side](./plots/oth-res.png)
+
+### A-4
+Three pairs of hash functions have been used and can be found in `./src/load-balancer/hash/hash_functions.py`.
+
+#### Given Hash Function
+$$
+H(i) = i*i + 2*i + 17
+\phi(i, j) = i*i + j*j + 2*j + 25
+$$
+
+#### Modified Hash Function
+The coefficients are large and prime to cover the whole slot-space nearly uniformly with larger distance between virtual copies and so that taking modulo by any slot size does not reduce randomness
+$$
+H(i) = 1427*i*i + 2503*i + 2003
+\phi(i, j) = 1249*i*i + 2287*j*j + 1663*j + 2287
+$$
+
+#### Cyrptographic Hash Function
+SHA-256 has been used for both $H and \phi$
 
 ## Main Libraries Used
 ### [Quart](https://pgjones.gitlab.io/quart/)
