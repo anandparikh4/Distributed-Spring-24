@@ -85,17 +85,16 @@ The load balancer is tested for all the endpoints and the corresponding logs of 
 Three pairs of hash functions have been used and can be found in `./src/load-balancer/hash/hash_functions.py`.
 
 #### Given Hash Function
-$$
-H(i) = i^2 + 2i + 17
-\phi(i, j) = i^2 + j^2 + 2j + 25
-$$
+>$H(i) = i^2 + 2i + 17$
+
+>$\phi(i, j) = i^2 + j^2 + 2j + 25$
 
 #### Modified Hash Function
-The coefficients are large and prime to cover the whole slot-space nearly uniformly with larger distance between virtual copies and so that taking modulo by any slot size does not reduce randomness
-$$
-H(i) = 1427i^2 + 2503i + 2003
-\phi(i, j) = 1249i^2 + 2287j^2 + 1663j + 2287
-$$
+The coefficients are large and prime to cover the whole slot-space nearly uniformly with larger distance between virtual copies and so that taking modulo by any slot size does not reduce randomness.
+
+>$H(i) = 1427i^2 + 2503i + 2003$
+
+>$\phi(i, j) = 1249i^2 + 2287j^2 + 1663j + 2287$
 
 #### Cyrptographic Hash Function
 SHA-256 has been used for both $H$ and $\phi$
