@@ -6,6 +6,17 @@
 * Ritwik Ranjan Mallik - 20CS10049
 * Anand Manojkumar Parikh - 20CS10007
 
+## How to run
+We have supplied a [Makefile](./src/Makefile) in the `./src` directory.
+To start everything:
+```shell
+make
+```
+To stop everything:
+```shell
+make stop
+```
+
 ## Testing 
 Two python files can be used for testing the application. These are as follows:
 1. `client.py`: It is a commandline interface to send requests to the load balancer end points.
