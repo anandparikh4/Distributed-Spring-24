@@ -1,4 +1,4 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, g, jsonify, request
 
 from common import *
 
@@ -10,7 +10,7 @@ async def catch_all(path):
     """
     Catch all other routes and return an error message.
     """
-
+    
     return jsonify(ic({
         'message': f'<Error> `/{path}` endpoint does not exist in server replicas',
         'status': 'failure'

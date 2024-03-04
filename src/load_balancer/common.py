@@ -7,7 +7,6 @@ from icecream import ic
 
 from consts import *
 from hash import ConsistentHashMap, requestHashList, serverHashList
-from utils import *
 
 # Lock to protect the replicas list
 lock = FifoLock()
