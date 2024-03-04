@@ -1,13 +1,14 @@
-import aiohttp
 import asyncio
 import os
 import random
 import sys
+
+import aiohttp
 from aiodocker import Docker
+from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
-from quart import Quart, request, jsonify
-from colorama import Fore, Style
+from quart import Quart, jsonify, request
 
 from hash import ConsistentHashMap, requestHashList, serverHashList
 from utils import *

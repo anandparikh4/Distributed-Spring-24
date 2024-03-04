@@ -1,6 +1,7 @@
-import sys
-import signal
 import random
+import signal
+import sys
+
 import requests
 
 # URL of the server

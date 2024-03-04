@@ -1,5 +1,6 @@
 import os
 import sys
+
 from icecream import ic
 from quart import Quart, Response, jsonify
 

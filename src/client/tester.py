@@ -1,9 +1,10 @@
-import sys
-from matplotlib import pyplot as plt
-from pprint import pp
 import asyncio
-import aiohttp
+import sys
+from pprint import pp
 from time import time
+
+import aiohttp
+from matplotlib import pyplot as plt
 
 # URL of the server
 url = 'http://127.0.0.1:5000'
