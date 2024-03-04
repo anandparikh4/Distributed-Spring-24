@@ -1,7 +1,5 @@
 from quart import Blueprint
 
-from common import *
-
 from .catch_all import blueprint as catch_all_blueprint
 from .home import blueprint as home_blueprint
 

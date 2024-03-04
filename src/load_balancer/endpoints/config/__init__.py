@@ -1,7 +1,5 @@
 from quart import Blueprint
 
-from common import *
-
 from .rep import blueprint as rep_blueprint
 from .add import blueprint as add_blueprint
 from .rm import blueprint as rm_blueprint

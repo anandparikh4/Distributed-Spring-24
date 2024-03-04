@@ -6,7 +6,6 @@ import aiohttp
 import asyncpg
 
 from common import *
-from consts import *
 
 
 class Read(asyncio.Future):

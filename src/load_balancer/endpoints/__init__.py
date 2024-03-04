@@ -1,7 +1,5 @@
 from quart import Blueprint
 
-from common import *
-
 from .config import blueprint as config_blueprint
 from .database import blueprint as database_blueprint
 from .other import blueprint as other_blueprint

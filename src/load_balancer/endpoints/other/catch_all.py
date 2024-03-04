@@ -1,4 +1,4 @@
-from quart import Blueprint, g, jsonify, request
+from quart import Blueprint, jsonify
 
 from common import *
 

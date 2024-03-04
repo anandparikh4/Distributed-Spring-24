@@ -1,8 +1,7 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify
 
 from common import *
 from utils import *
-from consts import *
 
 blueprint = Blueprint('home', __name__)
 

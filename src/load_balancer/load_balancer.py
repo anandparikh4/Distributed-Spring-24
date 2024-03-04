@@ -3,8 +3,6 @@ import asyncio
 import asyncpg
 from quart import Quart
 
-from common import *
-from consts import *
 from endpoints import blueprint as all_blueprints
 from utils import *
 
@@ -26,14 +24,14 @@ async def my_startup():
     app.add_background_task(get_heartbeats)
 
     # Connect to the database
-    app.pool = await asyncpg.create_pool(
+    app.pool = await asyncpg.create_pool(  # type: ignore
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
         host=DB_HOST
     )
 
-    if app.pool is None:
+    if app.pool is None:  # type: ignore
         print(f'{Fore.RED}ERROR | '
               f'Failed to connect to the database'
               f'{Style.RESET_ALL}',
