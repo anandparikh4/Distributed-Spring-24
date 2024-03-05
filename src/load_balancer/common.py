@@ -18,6 +18,7 @@ ic.configureOutput(prefix='[LB] | ')
 if not DEBUG:
     ic.disable()
 
+
 # List to store web server replica hostnames
 replicas = ConsistentHashMap(
     request_hash=requestHashList[HASH_NUM],
@@ -29,7 +30,7 @@ heartbeat_fail_count: dict[str, int] = {}
 
 
 # server ids
-serv_ids = {
+serv_ids: dict[str, int] = {
     "Server-0": 123456,
     "Server-1": 234567,
     "Server-2": 345678,
@@ -37,4 +38,9 @@ serv_ids = {
 
 
 # Shard Name to ConsistentHashMap
-shard_map: dict[str, list[str]] = {"sh1":[]}
+# To be filled by the load balancer with use
+shard_map: dict[str, list[str]] = {}
+
+# Shard Name to FifoLock
+# To be filled by the load balancer with use
+shard_locks: dict[str, FifoLock] = {}

@@ -1,5 +1,5 @@
 aiodocker
-aiohttp
+aiohttp[speedups]
 asyncpg
 colorama
 fifolock

@@ -43,6 +43,74 @@ def err_payload(err: Exception):
 # END err_payload
 
 
+def get_container_config(
+    serv_id: int,
+    hostname: str
+):
+    """
+    Get the container config for the server replica.
+    """
+
+    return {
+        'image': 'server:v2',
+        'detach': True,
+        'env': [
+            f'SERVER_ID={serv_id:06}',
+            'DEBUG=true',
+            'POSTGRES_HOST=localhost',
+            'POSTGRES_PORT=5432',
+            'POSTGRES_USER=postgres',
+            'POSTGRES_PASSWORD=postgres',
+            'POSTGRES_DB_NAME=postgres',
+        ],
+        'hostname': hostname,
+        'tty': True,
+    }
+
+
+async def add_shards(
+    hostname: str,
+    shards: list[str]
+):
+    """
+    Call the /config endpoint of the server replica to add shards.
+
+    `hostname:` server replica hostname
+    `shards:` list of shard names to add
+    """
+
+    async def wrapper(
+        session: aiohttp.ClientSession,
+        server_name: str,
+        payload: dict
+    ):
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with session.post(
+            f'http://{server_name}:5000/config',
+                json=payload) as response:
+            await response.read()
+
+        return response
+    # END wrapper
+
+    # Convert to aiohttp request
+    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        payload = {'shards': shards}
+        tasks = [asyncio.create_task(wrapper(session, hostname, payload))]
+        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+        serv_response = serv_response[0] if not isinstance(
+            serv_response[0], BaseException) else None
+    # END async with
+
+    if serv_response is None:
+        raise Exception('Server did not respond. Failed to add shards')
+
+# END add_shards
+
+
 async def gather_with_concurrency(
     session: aiohttp.ClientSession,
     batch: int,
@@ -96,14 +164,7 @@ async def handle_flatline(
 
     try:
         async with Docker() as docker:
-            container_config = {
-                'image': 'server:v1',
-                'detach': True,
-                'env': [f'SERVER_ID={serv_id}',
-                        'DEBUG=true'], # TODO: add more envs
-                'hostname': hostname,
-                'tty': True,
-            }
+            container_config = get_container_config(serv_id, hostname)
 
             # create the container
             container = await docker.containers.create_or_replace(
@@ -136,6 +197,13 @@ async def handle_flatline(
                       f'{Style.RESET_ALL}',
                       file=sys.stderr)
         # END async with docker
+
+        # Call /config endpoint to add shards to the server
+        shards = [shard
+                  for shard, servers in shard_map.items()
+                  if hostname in servers]
+
+        await add_shards(hostname, shards)
 
     except Exception as e:
         if DEBUG:
@@ -265,9 +333,16 @@ async def create_db_pool():
     )
 
     if pool is None:
-        print(f'Failed to connect to database at {DB_HOST}:{DB_PORT}',
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to create database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
+              f'{Style.RESET_ALL}',
               file=sys.stderr)
         sys.exit(1)
+    else:
+        print(f'{Fore.LIGHTGREEN_EX}DB | '
+              f'Created database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
 
     return pool
 # END create_db_pool
