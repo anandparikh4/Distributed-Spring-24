@@ -41,7 +41,7 @@ ENV PYTHONUNBUFFERED 1
 EXPOSE 5000
 
 # Set the entrypoint
-COPY deploy.sh /docker-entrypoint-initdb.d/
+COPY init/ /docker-entrypoint-initdb.d/
 
 # Copy the application
 COPY . .

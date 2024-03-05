@@ -28,7 +28,8 @@ async def my_startup():
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
-        host=DB_HOST
+        host=DB_HOST,
+        port=DB_PORT
     )
 
     if app.pool is None:  # type: ignore
