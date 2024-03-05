@@ -37,4 +37,7 @@ serv_ids = {
 
 
 # Shard Name to ConsistentHashMap
-shard_map: dict[str, list[str]] = {"sh1":[]}
+shard_map: dict[str, list[str]] = {"sh1":[]} # TODO: change list[str] to ConsistentHashMap
+
+# Shard Name to Shard Lock
+shard_locks: dict[str, FifoLock] = {}
