@@ -1,12 +1,30 @@
 version: "3.9"
-name: distributed_systems
+name: distributed_systems_2
 
-# define services
 services:
+
+  Server-0:
+    build: ./server
+    image: server:v2
+    container_name: Server-0
+    networks:
+      my_net:
+        aliases:
+          - Server-0
+    hostname: Server-0
+    tty: true
+    environment:
+      SERVER_ID: 0
+      DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Server-1:
     build: ./server
-    image: server:v1
+    image: server:v2
     container_name: Server-1
     networks:
       my_net:
@@ -17,10 +35,15 @@ services:
     environment:
       SERVER_ID: 1
       DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Server-2:
     build: ./server
-    image: server:v1
+    image: server:v2
     container_name: Server-2
     networks:
       my_net:
@@ -31,24 +54,15 @@ services:
     environment:
       SERVER_ID: 2
       DEBUG: "true"
-
-  Server-3:
-    build: ./server
-    image: server:v1
-    container_name: Server-3
-    networks:
-      my_net:
-        aliases:
-          - Server-3
-    hostname: Server-3
-    tty: true
-    environment:
-      SERVER_ID: 3
-      DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Load-Balancer:
     build: ./load_balancer
-    image: load:v1
+    image: load:v2
     container_name: Load-Balancer
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -64,6 +78,11 @@ services:
     environment:
       HASH_NUM: 1
       DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
 # define a network my_net
 networks:

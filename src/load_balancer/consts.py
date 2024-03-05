@@ -25,8 +25,8 @@ REQUEST_BATCH_SIZE = 10
 DOCKER_TASK_BATCH_SIZE = 10
 
 # Database constants
-DB_HOST = os.environ.get('DB_HOST', 'localhost')
-DB_PORT = int(os.environ.get('DB_PORT', 5432))
-DB_USER = os.environ.get('DB_USER', 'postgres')
-DB_PASSWORD = os.environ.get('DB_PASSWORD', 'postgres')
-DB_NAME = os.environ.get('DB_NAME', 'postgres')
+DB_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
+DB_PORT = int(os.environ.get('POSTGRES_PORT', 5432))
+DB_USER = os.environ.get('POSTGRES_USER', 'postgres')
+DB_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'postgres')
+DB_NAME = os.environ.get('POSTGRES_DB_NAME', 'postgres')
