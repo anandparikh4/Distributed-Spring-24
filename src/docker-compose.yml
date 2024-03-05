@@ -14,7 +14,7 @@ services:
     hostname: Server-0
     tty: true
     environment:
-      SERVER_ID: 0
+      SERVER_ID: 123456
       DEBUG: "true"
       POSTGRES_HOST: "localhost"
       POSTGRES_PORT: 5432
@@ -33,7 +33,7 @@ services:
     hostname: Server-1
     tty: true
     environment:
-      SERVER_ID: 1
+      SERVER_ID: 234567
       DEBUG: "true"
       POSTGRES_HOST: "localhost"
       POSTGRES_PORT: 5432
@@ -52,7 +52,7 @@ services:
     hostname: Server-2
     tty: true
     environment:
-      SERVER_ID: 2
+      SERVER_ID: 345678
       DEBUG: "true"
       POSTGRES_HOST: "localhost"
       POSTGRES_PORT: 5432

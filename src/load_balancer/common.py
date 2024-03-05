@@ -30,11 +30,11 @@ heartbeat_fail_count: dict[str, int] = {}
 
 # server ids
 serv_ids = {
-    "Server-0": 0,
-    "Server-1": 1,
-    "Server-2": 2,
+    "Server-0": 123456,
+    "Server-1": 234567,
+    "Server-2": 345678,
 }  # Already 3 servers running
 
 
 # Shard Name to ConsistentHashMap
-shard_map: dict[str, list[str]] = {}
+shard_map: dict[str, list[str]] = {"sh1":[]}

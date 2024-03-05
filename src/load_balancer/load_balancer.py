@@ -92,6 +92,9 @@ async def my_shutdown():
                  for server_name in replicas.getServerList()]
         await asyncio.gather(*tasks, return_exceptions=True)
     # END async with Docker
+
+    # close the pool
+    await app.pool.close()  # type: ignore
 # END my_shutdown
 
 

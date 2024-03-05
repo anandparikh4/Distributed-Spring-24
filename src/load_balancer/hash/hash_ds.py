@@ -31,6 +31,7 @@ class ConsistentHashMap:
 
         # number of virtual copies to keep
         self.n_virtual = n_virtual
+
         if hostnames is None:
             # default hostnames
             hostnames = ["Server-1", "Server-2", "Server-3"]

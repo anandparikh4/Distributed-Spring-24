@@ -283,7 +283,7 @@ def get_new_server_id():
     # generate new 6-digit id not in `serv_ids`
     new_id = random.randint(1, 999999)
 
-    while new_id in serv_ids.items():
+    while new_id in serv_ids.values():
         new_id = random.randint(1, 999999)
     # END while
 
