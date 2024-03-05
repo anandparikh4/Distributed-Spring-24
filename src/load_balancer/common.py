@@ -28,5 +28,13 @@ replicas = ConsistentHashMap(
 heartbeat_fail_count: dict[str, int] = {}
 
 
-# server unique id generator (TODO: change this asap)
-serv_id = 3  # already have 3 servers running
+# server ids
+serv_ids = {
+    "Server-0": 0,
+    "Server-1": 1,
+    "Server-2": 2,
+}  # Already 3 servers running
+
+
+# Shard Name to ConsistentHashMap
+shard_map: dict[str, list[str]] = {}

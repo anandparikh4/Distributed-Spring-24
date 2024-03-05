@@ -137,6 +137,9 @@ async def rm():
 
                     # Edit the flatline map
                     heartbeat_fail_count.pop(hostname, None)
+                    
+                    # Remove the server id
+                    serv_ids.pop(hostname, None)
 
                     tasks.append(remove_container(docker, hostname))
                 # END for

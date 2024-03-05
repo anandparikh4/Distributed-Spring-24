@@ -44,7 +44,7 @@ async def add():
 
     global replicas
     global heartbeat_fail_count
-    global serv_id
+    global serv_ids
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -115,7 +115,7 @@ async def add():
                             'image': 'server:v1',
                             'detach': True,
                             'env': [f'SERVER_ID={serv_id}',
-                                    'DEBUG=true'],
+                                    'DEBUG=true'],  # TODO: add more envs
                             'hostname': hostname,
                             'tty': True,
                         }
@@ -171,8 +171,9 @@ async def add():
                     # Edit the flatline map
                     heartbeat_fail_count[hostname] = 0
 
-                    # increment server id
-                    serv_id += 1
+                    # get new server id
+                    serv_id = get_new_server_id()
+                    serv_ids[hostname] = serv_id
 
                     tasks.append(spawn_container(docker, serv_id, hostname))
                 # END for

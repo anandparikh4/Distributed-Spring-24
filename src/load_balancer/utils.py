@@ -100,7 +100,7 @@ async def handle_flatline(
                 'image': 'server:v1',
                 'detach': True,
                 'env': [f'SERVER_ID={serv_id}',
-                        'DEBUG=true'],
+                        'DEBUG=true'], # TODO: add more envs
                 'hostname': hostname,
                 'tty': True,
             }
@@ -155,7 +155,7 @@ async def get_heartbeats():
 
     global replicas
     global heartbeat_fail_count
-    global serv_id
+    global serv_ids
 
     if DEBUG:
         print(f'{Fore.CYAN}HEARTBEAT | '
@@ -228,7 +228,7 @@ async def get_heartbeats():
 
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
-                            serv_id += 1
+                            serv_id = serv_ids[hostnames[i]]
                             flatlines.append(wrapper(serv_id, hostnames[i]))
                     else:
                         # Reset the fail count for the server replica
@@ -271,3 +271,21 @@ async def create_db_pool():
 
     return pool
 # END create_db_pool
+
+
+def get_new_server_id():
+    """
+    Get a new server id.
+    """
+
+    global serv_ids
+
+    # generate new 6-digit id not in `serv_ids`
+    new_id = random.randint(1, 999999)
+
+    while new_id in serv_ids.items():
+        new_id = random.randint(1, 999999)
+    # END while
+
+    return new_id
+# END get_new_server_id
