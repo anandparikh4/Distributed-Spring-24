@@ -1,6 +1,5 @@
 from quart import Blueprint, current_app, jsonify, request
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('rm', __name__)
@@ -137,7 +136,7 @@ async def rm():
 
                     # Edit the flatline map
                     heartbeat_fail_count.pop(hostname, None)
-                    
+
                     # Remove the server id
                     serv_ids.pop(hostname, None)
 

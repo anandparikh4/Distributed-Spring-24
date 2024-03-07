@@ -1,6 +1,5 @@
 from quart import Blueprint, jsonify
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('home', __name__)

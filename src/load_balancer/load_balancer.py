@@ -1,6 +1,3 @@
-import asyncio
-
-import asyncpg
 from quart import Quart
 
 from endpoints import blueprint as all_blueprints
