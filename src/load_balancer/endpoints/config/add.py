@@ -1,6 +1,6 @@
+from typing import Any, Dict, List
 from quart import Blueprint, current_app, jsonify, request
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('add', __name__)
@@ -230,8 +230,6 @@ async def add():
     If some shard for some server in `hostnames` does not exist in `shard_map` union `new_shards`:
         Return an error message.
 
-    Random hostnames are generated using the `random_hostname()` function.
-
     `Request payload:`
         `n: number of hostnames to add`
         `new_shards: list of new shard names and description to add [optional]`
@@ -254,6 +252,7 @@ async def add():
     global replicas
     global heartbeat_fail_count
     global serv_ids
+    global shard_map
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -319,66 +318,8 @@ async def add():
 
             ic(hostnames, new_shards)
 
+            # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-            async def spawn_container(
-                docker: Docker,
-                serv_id: int,
-                hostname: str,
-                shards: list[str],
-            ):
-                # Allow other tasks to run
-                await asyncio.sleep(0)
-
-                try:
-                    async with semaphore:
-                        # spawn new docker containers for the new hostnames
-                        container_config = \
-                            get_container_config(serv_id, hostname)
-
-                        # create the container
-                        container = await docker.containers.create_or_replace(
-                            name=hostname,
-                            config=container_config,
-                        )
-
-                        # Attach the container to the network and set the alias
-                        my_net = await docker.networks.get('my_net')
-                        await my_net.connect({
-                            'Container': container.id,
-                            'EndpointConfig': {
-                                'Aliases': [hostname]
-                            }
-                        })
-
-                        if DEBUG:
-                            print(f'{Fore.LIGHTGREEN_EX}CREATE | '
-                                  f'Created container for {hostname}'
-                                  f'{Style.RESET_ALL}',
-                                  file=sys.stderr)
-
-                        # start the container
-                        await container.start()
-
-                        if DEBUG:
-                            print(f'{Fore.MAGENTA}SPAWN | '
-                                  f'Started container for {hostname}'
-                                  f'{Style.RESET_ALL}',
-                                  file=sys.stderr)
-                    # END async with semaphore
-
-                    # Call /config endpoint to add shards to the server
-                    await add_shards(hostname, shards)
-
-                except Exception as e:
-                    if DEBUG:
-                        print(f'{Fore.RED}ERROR | '
-                              f'{e}'
-                              f'{Style.RESET_ALL}',
-                              file=sys.stderr)
-                # END try-except
-            # END spawn_container
-
             async with Docker() as docker:
                 # Define tasks
                 tasks = []
@@ -400,19 +341,24 @@ async def add():
                         shard_locks[shard['shard_id']] = FifoLock()
                     # END for shard in new_shards
 
-                    # Add the shards to the shard_map
-                    for shard in servers[hostname]:
-                        shard_map[shard].append(hostname)
-                    # END for shard in servers[hostname]
-
                     tasks.append(spawn_container(docker, serv_id,
-                                                 hostname,
-                                                 servers[hostname]))
-                # END for
+                                                 hostname, semaphore))
+                # END for hostname in hostnames
 
                 # Wait for all tasks to complete
                 await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Add the shards to the shard_map
+                for hostname in hostnames:
+                    for shard in servers[hostname]:
+                        shard_map[shard].append(hostname)
+                    # END for shard in servers[hostname]
+                # END for hostname in hostnames
             # END async with Docker
+
+            # Copy shards to the new containers
+            semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+            # TODO: Add the shards to the new containers
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)
@@ -436,3 +382,200 @@ async def add():
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END add
+
+
+async def spawn_container(
+    docker: Docker,
+    serv_id: int,
+    hostname: str,
+    semaphore: asyncio.Semaphore
+):
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
+    try:
+        async with semaphore:
+            # spawn new docker containers for the new hostnames
+            container_config = \
+                get_container_config(serv_id, hostname)
+
+            # create the container
+            container = await docker.containers.create_or_replace(
+                name=hostname,
+                config=container_config,
+            )
+
+            # Attach the container to the network and set the alias
+            my_net = await docker.networks.get('my_net')
+            await my_net.connect({
+                'Container': container.id,
+                'EndpointConfig': {
+                    'Aliases': [hostname]
+                }
+            })
+
+            if DEBUG:
+                print(f'{Fore.LIGHTGREEN_EX}CREATE | '
+                      f'Created container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
+
+            # start the container
+            await container.start()
+
+            if DEBUG:
+                print(f'{Fore.MAGENTA}SPAWN | '
+                      f'Started container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
+
+        # END async with semaphore
+
+    except Exception as e:
+        if DEBUG:
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
+    # END try-except
+# END spawn_container
+
+
+async def copy_shards_to_container(
+    hostname: str,
+    shards: List[str],
+    semaphore: asyncio.Semaphore
+):
+    """
+    1. Call /config endpoint on the server S with the hostname
+    1. For each shard K in `shards`:
+        1. Get server A from `shard_map` for the shard K
+        1. Call /copy on server A to copy the shard K 
+        1. Call /write on server S to write the shard K
+
+    Args:
+        - hostname: hostname of the server
+        - shards: list of shard names to copy
+        - semaphore: asyncio.Semaphore
+    """
+
+    global shard_map
+
+    # Allow other tasks to run
+    await asyncio.sleep(0)
+
+    async def post_config_wrapper(
+        session: aiohttp.ClientSession,
+        hostname: str,
+        shards: list[str],
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            async with session.post(f'http://{hostname}:5000/config',
+                                    json={'shards': shards}) as response:
+                await response.read()
+
+            return response
+        # END async with semaphore
+    # END post_config_wrapper
+
+    async def get_copy_wrapper(
+        session: aiohttp.ClientSession,
+        hostname: str,
+        shards: list[str],
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            async with session.get(f'http://{hostname}:5000/copy',
+                                   json={'shards': shards}) as response:
+                await response.read()
+
+            return response
+        # END async with semaphore
+    # END get_copy_wrapper
+
+    async def post_write_wrapper(
+        session: aiohttp.ClientSession,
+        hostname: str,
+        payload: Dict[str, Any],
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            async with session.post(f'http://{hostname}:5000/write',
+                                    json=payload) as response:
+                await response.read()
+
+            return response
+        # END async with semaphore
+
+    try:
+        call_server_shards: Dict[str, List[str]] = {}
+
+        # For each shard K in `shards`:
+        for shard in shards:
+            # Get server A from `shard_map` for the shard K
+            server = shard_map[shard][0]  # TODO: Add load balancing
+
+            call_server_shards[server] = call_server_shards.get(server, [])
+            call_server_shards[server].append(shard)
+        # END for shard in shards
+
+        async with aiohttp.ClientSession() as session:
+            # Call /config endpoint on the server S with the hostname
+            config_task = asyncio.create_task(
+                post_config_wrapper(session, hostname, shards))
+            response = await asyncio.gather(*[config_task], return_exceptions=True)
+            response = None if isinstance(
+                response[0], BaseException) else response[0]
+
+            if response is None or response.status != 200:
+                raise Exception(f'Failed to add shards to {hostname}')
+
+            # Call /copy on server A to copy the shard K
+            # Define tasks
+            tasks = [asyncio.create_task(get_copy_wrapper(
+                session, server, shards))
+                for server, shards in call_server_shards.items()]
+
+            # Wait for all tasks to complete
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            responses = [None if isinstance(
+                response, BaseException) else response for response in responses]
+
+            # Get the data from the responses
+            all_data: Dict[str, List[Any]] = {}
+
+            for (response, shards) in zip(responses,
+                                          call_server_shards.values()):
+                if response is None or response.status != 200:
+                    raise Exception(f'Failed to copy shards to {hostname}')
+
+                data: Dict = await response.json()
+
+                for shard in shards:
+                    all_data[shard] = data[shard]
+
+            # END for (response, shards) in zip(responses, call_server_shards.values())
+
+            # Call /write on server S to write the shard K
+            # Define tasks
+            payloads: List[Dict[str, Any]] = []
+
+            pool: asyncpg.Pool = current_app.pool # type: ignore
+                
+                
+
+    except Exception as e:
+        if DEBUG:
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
+    # END try-except
+# END copy_shards_to_container
