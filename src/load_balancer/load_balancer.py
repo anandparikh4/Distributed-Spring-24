@@ -55,7 +55,7 @@ async def my_shutdown():
     # Stop all server replicas
     semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-    async def wrapper(
+    async def stop_and_delete_container(
         docker: Docker,
         server_name: str
     ):
@@ -82,10 +82,10 @@ async def my_shutdown():
                           file=sys.stderr)
             # END try-except
         # END async with semaphore
-    # END wrapper
+    # END stop_and_delete_container
 
     async with Docker() as docker:
-        tasks = [wrapper(docker, server_name)
+        tasks = [stop_and_delete_container(docker, server_name)
                  for server_name in replicas.getServerList()]
         await asyncio.gather(*tasks, return_exceptions=True)
     # END async with Docker

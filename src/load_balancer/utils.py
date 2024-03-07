@@ -1,5 +1,3 @@
-
-
 from common import *
 
 
@@ -74,7 +72,10 @@ async def add_shards(
     `shards:` list of shard names to add
     """
 
-    async def wrapper(
+    # To allow other tasks to run
+    await asyncio.sleep(0)
+
+    async def server_config_post_wrapper(
         session: aiohttp.ClientSession,
         server_name: str,
         payload: dict
@@ -82,19 +83,19 @@ async def add_shards(
         # To allow other tasks to run
         await asyncio.sleep(0)
 
-        async with session.post(
-            f'http://{server_name}:5000/config',
-                json=payload) as response:
+        async with session.post(f'http://{server_name}:5000/config',
+                                json=payload) as response:
             await response.read()
 
         return response
-    # END wrapper
+    # END server_config_post_wrapper
 
     # Convert to aiohttp request
     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         payload = {'shards': shards}
-        tasks = [asyncio.create_task(wrapper(session, hostname, payload))]
+        tasks = [asyncio.create_task(
+            server_config_post_wrapper(session, hostname, payload))]
         serv_response = await asyncio.gather(*tasks, return_exceptions=True)
         serv_response = serv_response[0] if not isinstance(
             serv_response[0], BaseException) else None
@@ -104,40 +105,6 @@ async def add_shards(
         raise Exception('Server did not respond. Failed to add shards')
 
 # END add_shards
-
-
-async def gather_with_concurrency(
-    session: aiohttp.ClientSession,
-    batch: int,
-    *urls: str
-):
-    """
-    Gather with concurrency from aiohttp async session
-    """
-
-    # Allow other tasks to run
-    await asyncio.sleep(0)
-
-    semaphore = asyncio.Semaphore(batch)
-
-    async def fetch(url: str):
-        # Allow other tasks to run
-        await asyncio.sleep(0)
-
-        async with semaphore:
-            async with session.get(url) as response:
-                await response.read()
-
-            return response
-        # END async with semaphore
-    # END fetch
-
-    tasks = [fetch(url) for url in urls]
-
-    return [None if isinstance(r, BaseException)
-            else r for r in
-            await asyncio.gather(*tasks, return_exceptions=True)]
-# END gather_with_concurrency
 
 
 async def handle_flatline(
@@ -244,15 +211,32 @@ async def get_heartbeats():
                 hostnames = replicas.getServerList().copy()
             # END async with lock(Read)
 
-            # Generate heartbeat urls
-            heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
-                              for server_name in hostnames]
+            semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+            async def collect_heartbeat(
+                session: aiohttp.ClientSession,
+                server_name: str,
+            ):
+
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
+                async with semaphore:
+                    async with session.get(f'http://{server_name}:5000/heartbeat') as response:
+                        await response.read()
+
+                    return response
+                # END async with semaphore
+            # END collect_heartbeats
 
             # Convert to aiohttp request
             timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                heartbeats = await gather_with_concurrency(
-                    session, REQUEST_BATCH_SIZE, *heartbeat_urls)
+                tasks = [asyncio.create_task(collect_heartbeat(session, server_name))
+                         for server_name in hostnames]
+                heartbeats = await asyncio.gather(*tasks, return_exceptions=True)
+                heartbeats = [None if isinstance(heartbeat, BaseException)
+                              else heartbeat for heartbeat in heartbeats]
             # END async with session
 
             # To allow other tasks to run
@@ -260,7 +244,7 @@ async def get_heartbeats():
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def wrapper(
+            async def handle_flatline_wrapper(
                 serv_id: int,
                 server_name: str
             ):
@@ -278,7 +262,7 @@ async def get_heartbeats():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
-            # END wrapper
+            # END handle_flatline_wrapper
 
             flatlines = []
 
@@ -292,7 +276,8 @@ async def get_heartbeats():
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
                             serv_id = serv_ids[hostnames[i]]
-                            flatlines.append(wrapper(serv_id, hostnames[i]))
+                            flatlines.append(
+                                handle_flatline_wrapper(serv_id, hostnames[i]))
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0

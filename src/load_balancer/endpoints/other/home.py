@@ -37,7 +37,7 @@ async def home():
 
         ic(server_name)
 
-        async def wrapper(
+        async def get_home_wrapper(
             session: aiohttp.ClientSession,
             server_name: str
         ):
@@ -48,13 +48,13 @@ async def home():
                 await response.read()
 
             return response
-        # END wrapper
+        # END get_home_wrapper
 
         # Convert to aiohttp request
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            tasks = [asyncio.create_task(wrapper(session, server_name))]
-            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+            task = asyncio.create_task(get_home_wrapper(session, server_name))
+            serv_response = await asyncio.gather(*[task], return_exceptions=True)
             serv_response = serv_response[0] if not isinstance(
                 serv_response[0], BaseException) else None
         # END async with
