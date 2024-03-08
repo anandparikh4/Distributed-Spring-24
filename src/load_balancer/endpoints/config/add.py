@@ -1,4 +1,3 @@
-from typing import Any, Dict, List
 from quart import Blueprint, current_app, jsonify, request
 
 from utils import *
@@ -259,7 +258,7 @@ async def add():
 
     try:
         # Get the request payload
-        payload: dict = await request.get_json()
+        payload: Dict = await request.get_json()
         ic(payload)
 
         if payload is None:
@@ -269,10 +268,10 @@ async def add():
         n = int(payload.get('n', -1))
 
         # Get the list of server replica hostnames to add
-        servers: dict[str, list[str]] = dict(payload.get('servers', {}))
+        servers: Dict[str, List[str]] = dict(payload.get('servers', {}))
         hostnames = list(servers.keys())
 
-        new_shards: list[dict] = list(payload.get('new_shards', []))
+        new_shards: List[Dict] = list(payload.get('new_shards', []))
 
         if len(hostnames) != n:
             raise Exception(
@@ -358,7 +357,16 @@ async def add():
 
             # Copy shards to the new containers
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
-            # TODO: Add the shards to the new containers
+
+            # Define tasks
+            tasks = [asyncio.create_task(
+                copy_shards_to_container(hostname,
+                                         servers[hostname],
+                                         semaphore)
+                     for hostname in hostnames)]
+
+            # Wait for all tasks to complete
+            await asyncio.gather(*tasks, return_exceptions=True)
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)
@@ -472,9 +480,13 @@ async def copy_shards_to_container(
         # Allow other tasks to run
         await asyncio.sleep(0)
 
+        payload = {
+            'shards': shards
+        }
+
         async with semaphore:
             async with session.post(f'http://{hostname}:5000/config',
-                                    json={'shards': shards}) as response:
+                                    json=payload) as response:
                 await response.read()
 
             return response
@@ -489,9 +501,14 @@ async def copy_shards_to_container(
         # Allow other tasks to run
         await asyncio.sleep(0)
 
+        payload = {
+            'shards': shards,
+            'admin': True,
+        }
+
         async with semaphore:
             async with session.get(f'http://{hostname}:5000/copy',
-                                   json={'shards': shards}) as response:
+                                   json=payload) as response:
                 await response.read()
 
             return response
@@ -545,31 +562,43 @@ async def copy_shards_to_container(
 
             # Wait for all tasks to complete
             responses = await asyncio.gather(*tasks, return_exceptions=True)
-            responses = [None if isinstance(
-                response, BaseException) else response for response in responses]
+            responses = [None if isinstance(response, BaseException) else response
+                         for response in responses]
 
-            # Get the data from the responses
+            # Get the data from the responses [shard_id -> list of data]
             all_data: Dict[str, List[Any]] = {}
 
-            for (response, shards) in zip(responses,
-                                          call_server_shards.values()):
+            for (response, server_shards) in zip(responses,
+                                                 call_server_shards.values()):
                 if response is None or response.status != 200:
                     raise Exception(f'Failed to copy shards to {hostname}')
 
                 data: Dict = await response.json()
 
-                for shard in shards:
+                for shard in server_shards:
                     all_data[shard] = data[shard]
-
             # END for (response, shards) in zip(responses, call_server_shards.values())
 
             # Call /write on server S to write the shard K
             # Define tasks
-            payloads: List[Dict[str, Any]] = []
+            tasks = [asyncio.create_task(post_write_wrapper(
+                session, hostname, payload={
+                    'shard': shard,
+                    'data': data,
+                    'curr_idx': 0,
+                    'admin': True,
+                })) for shard, data in all_data.items()]
 
-            pool: asyncpg.Pool = current_app.pool # type: ignore
-                
-                
+            # Wait for all tasks to complete
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            responses = [None if isinstance(response, BaseException) else response
+                         for response in responses]
+
+            if any(response is None or response.status != 200
+                   for response in responses):
+                raise Exception(f'Failed to write shards to {hostname}')
+
+        # END async with aiohttp.ClientSession
 
     except Exception as e:
         if DEBUG:

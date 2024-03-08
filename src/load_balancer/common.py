@@ -9,6 +9,7 @@ from aiodocker import Docker
 from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
+from typing import List, Dict, Any, Tuple
 
 from consts import *
 from hash import ConsistentHashMap, requestHashList, serverHashList
@@ -31,11 +32,11 @@ replicas = ConsistentHashMap(
 
 
 # Map to store heartbeat fail counts for each server replica.
-heartbeat_fail_count: dict[str, int] = {}
+heartbeat_fail_count: Dict[str, int] = {}
 
 
 # server ids
-serv_ids: dict[str, int] = {
+serv_ids: Dict[str, int] = {
     "Server-0": 123456,
     "Server-1": 234567,
     "Server-2": 345678,
@@ -44,8 +45,8 @@ serv_ids: dict[str, int] = {
 
 # Shard Name to ConsistentHashMap
 # To be filled by the load balancer with use
-shard_map: dict[str, list[str]] = {}
+shard_map: Dict[str, List[str]] = {}
 
 # Shard Name to FifoLock
 # To be filled by the load balancer with use
-shard_locks: dict[str, FifoLock] = {}
+shard_locks: Dict[str, FifoLock] = {}
