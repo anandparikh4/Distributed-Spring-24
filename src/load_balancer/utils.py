@@ -1,4 +1,5 @@
 from common import *
+from endpoints.config.add import copy_shards_to_container
 
 
 class Read(asyncio.Future):
@@ -160,12 +161,19 @@ async def handle_flatline(
                       file=sys.stderr)
         # END async with docker
 
-        # Call /config endpoint to add shards to the server
+        # Copy shards to the new containers
         shards = [shard
                   for shard, servers in shard_map.items()
                   if hostname in servers]
 
-        await add_shards(hostname, shards)
+        semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+        # Define task to copy shards to the new container
+        task = asyncio.create_task(
+            copy_shards_to_container(hostname, shards, semaphore))
+
+        # Wait for task to complete
+        await asyncio.gather(*[task], return_exceptions=True)
 
     except Exception as e:
         if DEBUG:

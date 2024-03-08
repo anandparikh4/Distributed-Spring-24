@@ -271,7 +271,7 @@ async def add():
         servers: Dict[str, List[str]] = dict(payload.get('servers', {}))
         hostnames = list(servers.keys())
 
-        new_shards: List[Dict] = list(payload.get('new_shards', []))
+        new_shards: List[Dict[str, Any]] = list(payload.get('new_shards', []))
 
         if len(hostnames) != n:
             raise Exception(
@@ -319,6 +319,7 @@ async def add():
 
             # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+
             async with Docker() as docker:
                 # Define tasks
                 tasks = []
@@ -336,6 +337,7 @@ async def add():
 
                     # Add the shards to the shard_locks and shard_map
                     for shard in new_shards:
+                        # Change to ConsistentHashMap
                         shard_map[shard['shard_id']] = []
                         shard_locks[shard['shard_id']] = FifoLock()
                     # END for shard in new_shards
@@ -347,12 +349,6 @@ async def add():
                 # Wait for all tasks to complete
                 await asyncio.gather(*tasks, return_exceptions=True)
 
-                # Add the shards to the shard_map
-                for hostname in hostnames:
-                    for shard in servers[hostname]:
-                        shard_map[shard].append(hostname)
-                    # END for shard in servers[hostname]
-                # END for hostname in hostnames
             # END async with Docker
 
             # Copy shards to the new containers
@@ -367,6 +363,13 @@ async def add():
 
             # Wait for all tasks to complete
             await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Update the shard_map with the new replicas
+            for hostname in hostnames:
+                for shard in servers[hostname]:
+                    shard_map[shard].append(hostname)
+                # END for shard in servers[hostname]
+            # END for hostname in hostnames
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)
@@ -532,10 +535,15 @@ async def copy_shards_to_container(
         # END async with semaphore
 
     try:
+        # List of shards to copy from each server A [server A -> list of shards]
         call_server_shards: Dict[str, List[str]] = {}
 
         # For each shard K in `shards`:
         for shard in shards:
+            # Ignore empty shards
+            if len(shard_map[shard]) == 0:
+                continue
+
             # Get server A from `shard_map` for the shard K
             server = shard_map[shard][0]  # TODO: Add load balancing
 
