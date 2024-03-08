@@ -458,7 +458,7 @@ async def copy_shards_to_container(
     1. Call /config endpoint on the server S with the hostname
     1. For each shard K in `shards`:
         1. Get server A from `shard_map` for the shard K
-        1. Call /copy on server A to copy the shard K 
+        1. Call /copy on server A to copy the shard K
         1. Call /write on server S to write the shard K
 
     Args:
@@ -543,7 +543,8 @@ async def copy_shards_to_container(
             call_server_shards[server].append(shard)
         # END for shard in shards
 
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             # Call /config endpoint on the server S with the hostname
             config_task = asyncio.create_task(
                 post_config_wrapper(session, hostname, shards))
@@ -581,8 +582,8 @@ async def copy_shards_to_container(
 
             # Call /write on server S to write the shard K
             # Define tasks
-            tasks = [asyncio.create_task(post_write_wrapper(
-                session, hostname, payload={
+            tasks = [asyncio.create_task(
+                post_write_wrapper(session, hostname, payload={
                     'shard': shard,
                     'data': data,
                     'curr_idx': 0,
@@ -607,4 +608,5 @@ async def copy_shards_to_container(
                   f'{Style.RESET_ALL}',
                   file=sys.stderr)
     # END try-except
+
 # END copy_shards_to_container
