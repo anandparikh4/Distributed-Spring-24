@@ -2,7 +2,7 @@ from quart import Blueprint, current_app, jsonify
 
 from utils import *
 
-blueprint = Blueprint('rep', __name__)
+blueprint = Blueprint('status', __name__)
 
 
 @blueprint.route('/status', methods=['GET'])
@@ -21,46 +21,58 @@ async def status():
     global shard_map
     global serv_ids
     global pool
+    
+    await asyncio.sleep(0)
 
-    async with lock(Read):
-        shards: List[Dict[str, Any]] = []
+    try :
+        async with lock(Read):
+            shards: List[Dict[str, Any]] = []
 
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                stmt = await conn.prepare(
-                    '''--sql
-                        SELECT
-                            stud_id_low,
-                            shard_id,
-                            shard_size,
-                        FROM
-                            shardT
-                    ''')
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    stmt = await conn.prepare(
+                        '''--sql
+                            SELECT
+                                stud_id_low,
+                                shard_id,
+                                shard_size,
+                            FROM
+                                shardT
+                        ''')
 
-                async for record in stmt.cursor():
-                    shards.append(dict(record))
-                # END async for record in stmt.cursor()
-            # END async with conn.transaction()
-        # END async with pool.acquire()
+                    async for record in stmt.cursor():
+                        shards.append(dict(record))
+                    # END async for record in stmt.cursor()
+                # END async with conn.transaction()
+            # END async with pool.acquire()
 
-        servers_to_shards: Dict[str, List[str]] = {}
+            servers_to_shards: Dict[str, List[str]] = {}
 
-        for shard, servers in shard_map.items():
-            for server in servers:
-                servers_to_shards[server] = servers_to_shards.get(server, [])
-                servers_to_shards[server].append(shard)
-            # END for server in servers
-        # END for shard, servers in shard_map.items()
+            for shard, servers in shard_map.items():
+                for server in servers:
+                    servers_to_shards[server] = servers_to_shards.get(server, [])
+                    servers_to_shards[server].append(shard)
+                # END for server in servers
+            # END for shard, servers in shard_map.items()
 
-        # Return the response payload
-        return jsonify(ic({
-            'N': len(replicas),
-            'shards': shards,
-            'servers': [{
-                'id': serv_ids[server],
+            # Return the response payload
+            return jsonify(ic({
+                'N': len(replicas),
                 'shards': shards,
-            } for server, shards in servers_to_shards.items()],
-        })), 200
+                'servers': [{
+                    'id': serv_ids[server],
+                    'shards': shards,
+                } for server, shards in servers_to_shards.items()],
+            })), 200
 
-    # END async with lock
+        # END async with lock
+    except Exception as e:
+        if DEBUG:
+            print(f'{Fore.RED}ERROR | '
+                  f'{e}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
+
+        return jsonify(ic(err_payload(e))), 400
+    # END try-except
 # END status
