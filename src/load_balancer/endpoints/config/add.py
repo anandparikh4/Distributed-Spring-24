@@ -10,37 +10,41 @@ async def add():
     """
     Add new server replica hostname(s) and shards to the list.
 
-    If `len(hostnames) == n`:
-        Add `hostnames` to the list.
+    If `len(servers) == n`:
+        Update the `serv_ids` with the new server ids.
+        Update the `replicas` with the new hostnames.
+        Update the `shard_map` with the new shard -> server mapping.
     If `new_shards` is not empty:
         Add the new shards to the `shard_map`.
+        Add the new shards to the `shard_locks`.
+        Add the new shards to the `shardT` table.
 
-    If `len(hostnames) != n`:
+    If `len(servers) != n`:
         Return an error message.
     If relevant fields are not present in `new_shards`:
         Return an error message.
     If `n > remaining slots`:
         Return an error message.
-    If `hostname` in `hostnames` already exists in `replicas`:
+    If `hostname` in `servers` already exists in `replicas`:
         Do not add any replicas to the list.
         Return an error message.
     If some shard in `new_shards` already exists in `shard_map`:
         Return an error message.
-    If some shard for some server in `hostnames` does not exist in `shard_map` union `new_shards`:
+    If some shard for some server in `servers` does not exist in `shard_map` union `new_shards`:
         Return an error message.
 
     `Request payload:`
-        `n: number of hostnames to add`
+        `n: number of servers to add`
         `new_shards: list of new shard names and description to add [optional]`
             `stud_id_low: lower bound of student id`
             `shard_id: name of the shard`
             `shard_size: size of the shard`
-        `hostnames: dict of server hostname -> list of shard names to add [new shard names must be define in `new_shards`]`
+        `servers: dict of server hostname -> list of shard names to add [new shard names must be define in `new_shards`]`
 
     `Response payload:`
         `message:`
             `N: number of replicas`
-            `replicas: list of replica hostnames`
+            `replicas: list of replica servers`
         `status: status of the request`
 
     `Error payload:`
@@ -94,27 +98,28 @@ async def add():
 
             hostnames_set = set(hostnames)
             replicas_set = set(replicas.getServerList())
+            new_shard_ids: Set[str] = set(shard['shard_id']
+                                          for shard in new_shards)
 
-            # Check if all `hostnames` are in `replicas`
+            # Check if all `hostnames` are not in `replicas`
             if not hostnames_set.isdisjoint(replicas_set):
                 raise Exception(
                     f'Hostnames `{hostnames_set & replicas_set}` are already in replicas')
 
-            # Check if all shards in `new_shards` are not in `shard_map`
-            for shard in new_shards:
-                if shard['shard_id'] in shard_map.keys():
-                    raise Exception(
-                        f'Shard `{shard["shard_id"]}` already exists in shard_map')
+            # Check if all `new_shards` are not in `shard_map`
+            if not new_shard_ids.isdisjoint(shard_map.keys()):
+                raise Exception(
+                    f'Shards `{new_shard_ids & shard_map.keys()}` are already in shard_map')
 
             # Check if all shards for all servers in `hostnames` are in `shard_map` union `new_shards`
+            problems = set()
             for shards in servers.values():
-                for shard in shards:
-                    if shard not in shard_map.keys() and \
-                            shard not in [shard['shard_id'] for shard in new_shards]:
-                        raise Exception(
-                            f'Shard `{shard}` not found in shard_map or new_shards')
-                # END for shard in shards
+                problems |= set(shards) - new_shard_ids - shard_map.keys()
             # END for shards in servers.values()
+
+            if len(problems) > 0:
+                raise Exception(
+                    f'Shards `{problems}` are not defined in shard_map union new_shards')
 
             ic(hostnames, new_shards)
 
@@ -137,10 +142,10 @@ async def add():
                     serv_ids[hostname] = serv_id
 
                     # Add the shards to the shard_locks and shard_map
-                    for shard in new_shards:
+                    for shard in new_shard_ids:
                         # Change to ConsistentHashMap
-                        shard_map[shard['shard_id']] = []
-                        shard_locks[shard['shard_id']] = FifoLock()
+                        shard_map[shard] = []
+                        shard_locks[shard] = FifoLock()
                     # END for shard in new_shards
 
                     tasks.append(spawn_container(docker, serv_id,
@@ -178,12 +183,12 @@ async def add():
                         stud_id_low,
                         shard_id,
                         shard_size,
-                        valid_idx) 
+                        valid_idx)
                     VALUES (
-                        $1,
-                        $2,
-                        $3,
-                        $4)
+                        $1::INTEGER,
+                        $2::TEXT,
+                        $3::INTEGER,
+                        $4::TIMESTAMPTZ)
                     ''')
 
                 async with conn.transaction():
@@ -191,7 +196,7 @@ async def add():
                         [(shard['stud_id_low'],
                           shard['shard_id'],
                           shard['shard_size'],
-                          datetime.now())
+                          dt.now().astimezone())
                          for shard in new_shards])
                 # END async with conn.transaction()
             # END async with pool.acquire() as conn
