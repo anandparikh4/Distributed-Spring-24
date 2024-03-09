@@ -72,40 +72,42 @@ async def read():
 
         data = []
 
-        for shard_id in shard_ids:
-            if len(shard_map[shard_id]) > 0:
-                server_name = shard_map[shard_id][0] # TODO: Change to ConsistentHashMap
-                async with shard_locks[shard_id](Read):
-                    async def wrapper(
-                        session: aiohttp.ClientSession,
-                        server_name: str,
-                        json_payload: dict
-                    ):
-                        
-                        # To allow other tasks to run
-                        await asyncio.sleep(0)
+        async with lock(Read):
+            for shard_id in shard_ids:
+                if len(shard_map[shard_id]) > 0:
+                    server_name = shard_map[shard_id][0] # TODO: Change to ConsistentHashMap
+                    async with shard_locks[shard_id](Read):
+                        async def wrapper(
+                            session: aiohttp.ClientSession,
+                            server_name: str,
+                            json_payload: dict
+                        ):
 
-                        async with session.post(f'http://{server_name}:5000/read', json=json_payload) as response:
-                            await response.read()
+                            # To allow other tasks to run
+                            await asyncio.sleep(0)
 
-                        return response
-                    # END wrapper
+                            async with session.post(f'http://{server_name}:5000/read', json=json_payload) as response:
+                                await response.read()
 
-                     # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        tasks = [asyncio.create_task(wrapper(session, server_name))]
-                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                        serv_response = serv_response[0] if not isinstance(
-                            serv_response[0], BaseException) else None
+                            return response
+                        # END wrapper
+
+                         # Convert to aiohttp request
+                        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                        async with aiohttp.ClientSession(timeout=timeout) as session:
+                            tasks = [asyncio.create_task(wrapper(session, server_name))]
+                            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                            serv_response = serv_response[0] if not isinstance(
+                                serv_response[0], BaseException) else None
+                        # END async with
+
+                        if serv_response is None:
+                            raise Exception('Server did not respond')
+
+                        data.extend(serv_response["data"])
                     # END async with
-
-                    if serv_response is None:
-                        raise Exception('Server did not respond')
-                    
-                    data.extend(serv_response["data"])
-                # END async with
-        # END for
+            # END for
+        # END async with
                     
         # Return the response payload
         return jsonify(ic({
