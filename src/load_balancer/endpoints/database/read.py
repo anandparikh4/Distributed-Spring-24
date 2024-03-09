@@ -40,7 +40,7 @@ async def read():
             raise Exception('Payload is empty')
         
         # Get the required fields from the payload
-        stud_id = dict(payload.get('stud_id'))
+        stud_id: dict = payload.get('stud_id')
 
         if stud_id is None:
             raise Exception('Payload does not contain `stud_id` field')
