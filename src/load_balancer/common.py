@@ -2,6 +2,8 @@ import asyncio
 import random
 import sys
 import time
+from datetime import datetime
+
 
 import aiohttp
 import asyncpg
@@ -40,9 +42,9 @@ heartbeat_fail_count: Dict[str, int] = {}
 
 # server ids
 serv_ids: Dict[str, int] = {
-    "Server-0": 123456,
-    "Server-1": 234567,
-    "Server-2": 345678,
+    # "Server-0": 123456,
+    # "Server-1": 234567,
+    # "Server-2": 345678,
 }  # Already 3 servers running
 
 

@@ -16,21 +16,37 @@ async def my_startup():
 
     global pool
 
-    # Register the blueprints
-    app.register_blueprint(all_blueprints)
+    try:
+        # Register the blueprints
+        app.register_blueprint(all_blueprints)
 
-    # Register the heartbeat background task
-    app.add_background_task(get_heartbeats)
+        # Register the heartbeat background task
+        app.add_background_task(get_heartbeats)
 
-    # Connect to the database
-    pool = asyncpg.create_pool(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
+        # Connect to the database
+        pool = asyncpg.create_pool(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT,
+        )
 
+        await pool
+    except Exception as e:
+        print(f'{Fore.RED}ERROR | '
+              f'{e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to start the server. Exiting...'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        # Exit the program
+        sys.exit(1)
+    # END try-except
 # END my_startup
 
 
