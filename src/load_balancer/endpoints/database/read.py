@@ -95,7 +95,14 @@ async def read():
                          # Convert to aiohttp request
                         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(wrapper(session, server_name))]
+                            tasks = [asyncio.create_task(wrapper(
+                                session, 
+                                server_name, 
+                                json_payload={
+                                    "shard": shard_id,
+                                    "stud_id": stud_id
+                                }
+                            ))]
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                             serv_response = serv_response[0] if not isinstance(
                                 serv_response[0], BaseException) else None
