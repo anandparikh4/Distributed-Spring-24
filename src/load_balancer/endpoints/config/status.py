@@ -20,29 +20,25 @@ async def status():
     global replicas
     global shard_map
     global serv_ids
+    global pool
 
     async with lock(Read):
         shards: List[Dict[str, Any]] = []
 
-        pool = current_app.pool  # type: ignore
-
         async with pool.acquire() as conn:
             async with conn.transaction():
-                stmt = await conn.prepare('''--sql
-                    SELECT
-                        stud_id_low,
-                        shard_id,
-                        shard_size
-                    FROM
-                        shardT
-                ''')
+                stmt = await conn.prepare(
+                    '''--sql
+                        SELECT
+                            stud_id_low,
+                            shard_id,
+                            shard_size,
+                        FROM
+                            shardT
+                    ''')
 
                 async for record in stmt.cursor():
-                    shards.append({
-                        'stud_id_low': record['stud_id_low'],
-                        'shard_id': record['shard_id'],
-                        'shard_size': record['shard_size'],
-                    })
+                    shards.append(dict(record))
                 # END async for record in stmt.cursor()
             # END async with conn.transaction()
         # END async with pool.acquire()

@@ -17,6 +17,9 @@ from hash import ConsistentHashMap, requestHashList, serverHashList
 # Lock to protect the replicas list
 lock = FifoLock()
 
+# Postgres connection pool
+pool: asyncpg.Pool[asyncpg.Record]
+
 # Configure icecream output
 ic.configureOutput(prefix='[LB] | ')
 

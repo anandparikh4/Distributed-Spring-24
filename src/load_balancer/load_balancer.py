@@ -14,6 +14,8 @@ async def my_startup():
     Start heartbeat background task.
     """
 
+    global pool
+
     # Register the blueprints
     app.register_blueprint(all_blueprints)
 
@@ -21,21 +23,13 @@ async def my_startup():
     app.add_background_task(get_heartbeats)
 
     # Connect to the database
-    app.pool = await asyncpg.create_pool(  # type: ignore
+    pool = asyncpg.create_pool(
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
         host=DB_HOST,
-        port=DB_PORT
+        port=DB_PORT,
     )
-
-    if app.pool is None:  # type: ignore
-        print(f'{Fore.RED}ERROR | '
-              f'Failed to connect to the database'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
-        sys.exit(1)
-    # END if
 
 # END my_startup
 
@@ -48,6 +42,9 @@ async def my_shutdown():
     1. Stop the heartbeat background task.
     2. Stop all server replicas.
     """
+
+    global replicas
+    global pool
 
     # Stop the heartbeat background task
     app.background_tasks.pop().cancel()
@@ -91,7 +88,7 @@ async def my_shutdown():
     # END async with Docker
 
     # close the pool
-    await app.pool.close()  # type: ignore
+    await pool.close()
 # END my_shutdown
 
 
