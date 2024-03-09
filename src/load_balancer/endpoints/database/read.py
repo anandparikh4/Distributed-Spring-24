@@ -113,6 +113,7 @@ async def read():
 
                         data.extend(serv_response["data"])
                     # END async with
+                # END if
             # END for
         # END async with
                     

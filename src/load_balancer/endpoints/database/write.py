@@ -14,7 +14,7 @@ async def write():
         `data: list of entries to be written to the distributed database`
             `stud_id: student id`
             `stud_name: student name`
-            `stud_marks: marks obtained by the student`
+            `stud_marks: student marks`
     
     `Response payload:`
         `message: `len(data)` data entries added`
@@ -92,7 +92,7 @@ async def write():
                                 server_name,
                                 json_payload={
                                    "shard": shard_id,
-                                   "curr_idx": None,
+                                   "curr_idx": None, # TODO: Set this to the appropiate valid_idx
                                    "data": shard_data[shard_id] 
                                 }
                         )) for server_name in server_names]
@@ -103,6 +103,8 @@ async def write():
 
                     if serv_response is None:
                         raise Exception('Server did not respond')
+                    
+                    # TODO: Update valid_idx from server_response
                 # END async with
             # END for
         # END async with
