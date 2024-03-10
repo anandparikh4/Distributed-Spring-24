@@ -15,6 +15,7 @@ async def copy():
         Request payload:
             "shards": ["sh1", "sh2"...]
             "admin": true/false
+            "valid_idx": valid_idx
         
         Response payload:
             "sh1": [data]
@@ -32,6 +33,10 @@ async def copy():
         # Get the shard ids
         payload = await request.get_json()
         ic(payload)
+
+        valid_idx = payload.get('valid_idx', -1)
+
+        # TBD: Apply rules
 
         shards = payload.get('shards', [])
         admin = False

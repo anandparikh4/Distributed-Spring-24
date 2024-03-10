@@ -15,6 +15,7 @@ async def data_read():
         Request payload:
             "shard_id" : "sh1"
             "stud_id"  : {"low": low, "high": high}
+            "valid_idx": valid_idx
 
         Response payload:
             "data" : [{"stud_id": low, ...},
@@ -28,6 +29,10 @@ async def data_read():
         # Get the shard id and the range of stud_ids
         payload: dict = await request.get_json()
         ic(payload)
+
+        valid_idx = payload.get('valid_idx', -1)
+
+        # TBD: Apply rules
 
         shard_id = payload.get('shard_id', -1)
         stud_id : dict = payload.get('stud_id', {})

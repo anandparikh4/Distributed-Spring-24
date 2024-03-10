@@ -5,25 +5,22 @@ import sys
 from consts import *
 from common import *
 
-blueprint = Blueprint('write', __name__)
+blueprint = Blueprint('delete', __name__)
 
-@blueprint.route('/write', methods=['POST'])
-async def data_write():
+@blueprint.route('/delete', methods=['DELETE'])
+async def delete():
     """
         Returns requested data entries from the server container
 
         Request payload:
-            "shard_id" : "sh1"
-            "valid_idx" : valid_idx
-            "data" : [{"stud_id": low, ...},
-                      {"stud_id": low+1, ...},
-                      ...
-                      {"stud_id": high, ...}]
+            "shard"     : <shard_id>
+            "stud_id"   : <stud_id>
+            "valid_idx" : <valid_idx>
 
         Response payload:
-        "message": Data entries added
-        "curr_idx": curr_idx
-        "status": "success"
+            "message"  : Data entry with stud_id <stud_id> removed
+            "status"   : "success"
+            "curr_idx" : <curr_idx>
             
     """
 
@@ -36,24 +33,25 @@ async def data_write():
 
         # TBD: Apply rules, also increase the term if required
 
-        shard_id = payload.get('shard_id', -1)
-        data = payload.get('data', [])
+        shard = payload.get('shard', -1)
+        stud_id = payload.get('stud_id', -1)
 
-        # Insert the data into the database
+        # Delete data from the database
         async with current_app.pool.acquire() as connection:
             async with connection.transaction():
                 stmt = connection.prepare('''
-                    INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at, deleted_at)
-                    VALUES ($1, $2, $3, $4, $5, NULL);
+                    UPDATE StudT
+                    SET deleted_at = $1
+                    WHERE stud_id = $2 
+                    AND shard_id = $3;
                 ''')
-                for record_dict in data:
-                    await stmt.execute(record_dict['stud_id'], record_dict['stud_name'], record_dict['stud_marks'], shard_id, term)
+                await stmt.execute(term, stud_id, shard)
 
         # Send the response
         response_payload = {
-            "message": "Data entries added",
-            "curr_idx": term,
-            "status": "success"
+            "message": f'Data entry with stud_id {stud_id} removed',
+            "status": "success",
+            "curr_idx": term
         }
 
         return jsonify(response_payload), 200
