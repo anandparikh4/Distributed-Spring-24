@@ -12,6 +12,8 @@ async def rm():
 
     If `len(hostnames) <= n`:
         Delete `hostnames` and `n - len(hostnames)` random hostnames from the list.
+        While selecting other random hostnames, only select those servers which are not the only server for any shard.
+
     If `n <= 0`:
         Return an error message.
     If `n > len(replicas)`:
@@ -19,6 +21,9 @@ async def rm():
     If `len(hostnames) > n`:
         Return an error message.
     If for any hostname in `hostnames`, `hostname not in replicas`:
+        Do not delete any replicas from the list.
+        Return an error message.
+    If for any hostname S in `hostnames`, there exists some shard K such that S is the only server in `shard_map[K]`:
         Do not delete any replicas from the list.
         Return an error message.
 
@@ -47,7 +52,7 @@ async def rm():
 
     try:
         # Get the request payload
-        payload: dict = await request.get_json()
+        payload: Dict[str, Any] = await request.get_json()
         ic(payload)
 
         if payload is None:
@@ -57,7 +62,7 @@ async def rm():
         n = int(payload.get('n', -1))
 
         # Get the list of server replica hostnames to delete
-        hostnames: list[str] = list(payload.get('hostnames', []))
+        hostnames: List[str] = list(payload.get('hostnames', []))
 
         if n <= 0:
             raise Exception(
@@ -71,6 +76,20 @@ async def rm():
             raise Exception(
                 'Length of hostname list is more than instances to delete')
 
+        singles = {servers[0]: shard
+                   for shard, servers in shard_map.items()
+                   if len(servers) == 1}
+
+        single_problems = {server: shard
+                           for server, shard in singles.items()
+                           if server in hostnames}
+
+        if len(single_problems) > 0:
+            raise Exception(
+                f'Only one copy of shards `{single_problems.values()}` is '
+                f'present in the hostnames `{single_problems.keys()}` '
+                f'to delete, respectively.')
+
         async with lock(Write):
             choices = set(replicas.getServerList())
 
@@ -83,7 +102,12 @@ async def rm():
                     f'Hostnames `{hostnames_set - choices}` are not in replicas')
 
             # remove `hostnames` from `choices`
-            choices = list(choices - hostnames_set)
+            choices = list(choices - hostnames_set - singles.keys())
+
+            if (_k := len(choices) + len(hostnames)) < n:
+                raise Exception(
+                    f'Not enough replicas to delete. '
+                    f'Only {_k} replicas can be deleted.')
 
             # Choose `n - len(hostnames)` random hostnames from the list without replacement
             random_hostnames = random.sample(choices, k=n - len(hostnames))
@@ -132,6 +156,7 @@ async def rm():
 
                 # Delete the hostnames from the list
                 for hostname in hostnames:
+                    # Remove the server from the list
                     replicas.remove(hostname)
 
                     # Edit the flatline map
@@ -139,6 +164,11 @@ async def rm():
 
                     # Remove the server id
                     serv_ids.pop(hostname, None)
+                    
+                    # Remove server from shard_map
+                    for shard in shard_map.values():
+                        if hostname in shard:
+                            shard.remove(hostname)
 
                     tasks.append(remove_container(docker, hostname))
                 # END for

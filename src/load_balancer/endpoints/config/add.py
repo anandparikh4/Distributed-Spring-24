@@ -121,7 +121,7 @@ async def add():
                 raise Exception(
                     f'Shards `{problems}` are not defined in shard_map union new_shards')
 
-            ic(hostnames, new_shards)
+            ic("To add: ", hostnames, new_shards)
 
             # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
@@ -132,6 +132,7 @@ async def add():
 
                 # Add the hostnames to the list
                 for hostname in hostnames:
+                    # Add the hostname to the replicas list
                     replicas.add(hostname)
 
                     # Edit the flatline map
