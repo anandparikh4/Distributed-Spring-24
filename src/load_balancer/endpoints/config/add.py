@@ -182,21 +182,18 @@ async def add():
                     INSERT INTO shardT (
                         stud_id_low,
                         shard_id,
-                        shard_size,
-                        valid_idx)
+                        shard_size)
                     VALUES (
                         $1::INTEGER,
                         $2::TEXT,
-                        $3::INTEGER,
-                        $4::TIMESTAMPTZ)
+                        $3::INTEGER)
                     ''')
 
                 async with conn.transaction():
                     await stmt.executemany(
                         [(shard['stud_id_low'],
                           shard['shard_id'],
-                          shard['shard_size'],
-                          dt.now().astimezone())
+                          shard['shard_size'])
                          for shard in new_shards])
                 # END async with conn.transaction()
             # END async with pool.acquire() as conn
@@ -424,7 +421,6 @@ async def copy_shards_to_container(
                 post_write_wrapper(session, hostname, payload={
                     'shard': shard,
                     'data': data,
-                    'curr_idx': 0,
                     'admin': True,
                 })) for shard, data in all_data.items()]
 
