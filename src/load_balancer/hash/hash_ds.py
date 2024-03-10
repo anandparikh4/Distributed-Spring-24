@@ -94,9 +94,9 @@ class ConsistentHashMap:
                 i = len(self.server_slots) - 1
             i = (self.server_slots[i]+1) % self.n_slots
             while i != slot:
-                next_server[i] = hostname
+                self.next_server[i] = hostname
                 i = (i+1) % self.n_slots
-            next_server[slot] = hostname
+            self.next_server[slot] = hostname
 
     # remove a server (by hostname)
     # Time Complexity : O(n_slots * n_virtual)
@@ -110,10 +110,9 @@ class ConsistentHashMap:
         hostid = self.servers[hostname]
         self.servers.pop(hostname)
 
-        if(len(self.servers) == 0){
+        if(len(self.servers) == 0):
             self.next_server = [None] * self.n_slots
             self.server_slots = []
-        }
 
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(hostid, virtual_idx + 1)) % self.n_slots
@@ -132,10 +131,10 @@ class ConsistentHashMap:
             i = self.server_slots[i]
             other_hostname = self.next_server[i]
             i = (i+1) % self.n_slots
-            while != slot:
-                next_server[i] = other_hostname
+            while i != slot:
+                self.next_server[i] = other_hostname
                 i = (i+1) % self.n_slots
-            next_server[slot] = other_hostname
+            self.next_server[slot] = other_hostname
             self.server_slots.remove(slot)
 
     # find the server (by hostname) to which to route the request

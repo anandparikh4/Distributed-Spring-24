@@ -15,6 +15,7 @@ async def data_read():
         Request payload:
             "shard_id" : "sh1"
             "stud_id"  : {"low": low, "high": high}
+            "vat"      : vat
 
         Response payload:
             "data" : [{"stud_id": low, ...},
