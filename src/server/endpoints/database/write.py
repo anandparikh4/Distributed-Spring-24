@@ -13,16 +13,17 @@ async def data_write():
         Returns requested data entries from the server container
 
         Request payload:
-            "shard_id" : "sh1"
-            "valid_idx" : valid_idx
+            "shard" : "sh1"
             "data" : [{"stud_id": low, ...},
                       {"stud_id": low+1, ...},
                       ...
                       {"stud_id": high, ...}]
+            "admin": true/false
+            "valid_idx" : valid_idx
 
         Response payload:
         "message": Data entries added
-        "curr_idx": curr_idx
+        "curr_idx": <curr_idx>
         "status": "success"
             
     """
@@ -39,15 +40,32 @@ async def data_write():
         shard_id = payload.get('shard_id', -1)
         data = payload.get('data', [])
 
+        admin = False
+        if payload.get('admin', '').lower() == 'true':
+            admin = True
+        
+
         # Insert the data into the database
         async with current_app.pool.acquire() as connection:
             async with connection.transaction():
-                stmt = connection.prepare('''
-                    INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at, deleted_at)
-                    VALUES ($1, $2, $3, $4, $5, NULL);
-                ''')
-                for record_dict in data:
-                    await stmt.execute(record_dict['stud_id'], record_dict['stud_name'], record_dict['stud_marks'], shard_id, term)
+                stmt = None
+                if admin:
+                    stmt = connection.prepare('''
+                        INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at, deleted_at)
+                        VALUES ($1, $2, $3, $4, $5, $6);
+                    ''')
+                    
+                    for record_dict in data:
+                        await stmt.execute(record_dict['stud_id'], record_dict['stud_name'], record_dict['stud_marks'], record_dict['shard_id'], record_dict['created_at'], record_dict['deleted_at'])
+                
+                else:
+                    stmt = connection.prepare('''
+                        INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at, deleted_at)
+                        VALUES ($1, $2, $3, $4, $5, NULL);
+                    ''')
+
+                    for record_dict in data:
+                        await stmt.execute(record_dict['stud_id'], record_dict['stud_name'], record_dict['stud_marks'], shard_id, term)
 
         # Send the response
         response_payload = {
