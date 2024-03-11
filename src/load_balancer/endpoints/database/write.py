@@ -94,7 +94,7 @@ async def write():
                                     "shard": shard_id,
                                     "curr_idx": None, # TODO: Set this to the appropiate valid_idx
                                     "data": shard_data[shard_id],
-                                    "valid_at": None # TODO: send the value, declare in load balancer and send
+                                    "valid_at": valid_at
                                 }
                         )) for server_name in server_names]
                         serv_response = await asyncio.gather(*tasks, return_exceptions=True)

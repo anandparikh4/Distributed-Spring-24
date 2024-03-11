@@ -41,3 +41,6 @@ shard_map: dict[str, list[str]] = {"sh1":[]} # TODO: change list[str] to Consist
 
 # Shard Name to Shard Lock
 shard_locks: dict[str, FifoLock] = {}
+
+# valid_at for the Cat-Dat-Vat algorithm
+valid_at = 0
