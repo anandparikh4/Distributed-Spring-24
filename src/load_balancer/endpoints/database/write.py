@@ -60,7 +60,7 @@ async def write():
                 stud_id = entry["stud_id"]
                 async with conn.transaction():
                     async for record in stmt.cursor(stud_id):
-                        shard_id = record.shard_id
+                        shard_id = record["shard_id"]
                         if shard_id not in shard_data:
                             shard_data[shard_id] = []
                         shard_data[shard_id].append(entry)
@@ -68,7 +68,7 @@ async def write():
         async with lock(Read):
             for shard_id in shard_data:
                 server_names = shard_map[shard_id] # TODO: Chage to ConsistentHashMap
-                async with shard_locks[shard_id](Read):
+                async with shard_locks[shard_id](Write):
                     async def wrapper(
                         session: aiohttp.ClientSession,
                         server_name: str,
@@ -91,9 +91,10 @@ async def write():
                                 session, 
                                 server_name,
                                 json_payload={
-                                   "shard": shard_id,
-                                   "curr_idx": None, # TODO: Set this to the appropiate valid_idx
-                                   "data": shard_data[shard_id] 
+                                    "shard": shard_id,
+                                    "curr_idx": None, # TODO: Set this to the appropiate valid_idx
+                                    "data": shard_data[shard_id],
+                                    "valid_at": None # TODO: send the value, declare in load balancer and send
                                 }
                         )) for server_name in server_names]
                         serv_response = await asyncio.gather(*tasks, return_exceptions=True)
@@ -104,7 +105,8 @@ async def write():
                     if serv_response is None:
                         raise Exception('Server did not respond')
                     
-                    # TODO: Update valid_idx from server_response
+                    serv_response = await serv_response.json()
+                    # TODO: Update valid_at from server_response
                 # END async with
             # END for
         # END async with
