@@ -58,17 +58,17 @@ async def read():
             raise Exception('`low` cannot be greater than `high`')
         
         # Get the shard names containing the entries
-        shard_ids = []
+        shard_ids: list[str] = []
         pool = current_app.pool
         async with pool.acquire() as conn:
             stmt = conn.prepare(
             '''
-            SELECT shard_id FROM ShardT WHERE 
+            SELECT shard_id, valid_at FROM ShardT WHERE 
             (stud_id_low <= ($2::int)) AND (($1::int) <= stud_id_low + shard_size)
             ''')
             async with conn.transaction():
                 async for record in stmt.cursor(low, high):
-                    shard_ids.append(record.shard_id)
+                    shard_ids.append(record["shard_id"])
 
         data = []
 
@@ -100,7 +100,8 @@ async def read():
                                 server_name, 
                                 json_payload={
                                     "shard": shard_id,
-                                    "stud_id": stud_id
+                                    "stud_id": stud_id,
+                                    "valid_at": None # TODO: send the value, declare in load balancer and send
                                 }
                             ))]
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
@@ -111,7 +112,8 @@ async def read():
                         if serv_response is None:
                             raise Exception('Server did not respond')
 
-                        data.extend(serv_response["data"])
+                        serv_response: dict = await serv_response.json()
+                        data.extend(serv_response.get("data", []))
                     # END async with
                 # END if
             # END for
