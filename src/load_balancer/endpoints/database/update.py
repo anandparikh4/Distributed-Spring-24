@@ -65,7 +65,7 @@ async def update():
             ''')
             async with conn.transaction():
                 async for record in stmt.cursor(stud_id):
-                    shard_id = record.shard_id
+                    shard_id = record["shard_id"]
         
         if not shard_id:
             raise Exception(f'stud_id {stud_id} does not exist')
@@ -97,7 +97,8 @@ async def update():
                         json_payload={
                             "shard": shard_id,
                             "stud_id": stud_id,
-                            "data": data
+                            "data": data,
+                            "valid_at": None # TODO: send the value, declare in load balancer and send
                         }
                     )) for server_name in server_names]
                     serv_response = await asyncio.gather(*tasks, return_exceptions=True)
@@ -107,6 +108,9 @@ async def update():
 
                 if serv_response is None:
                     raise Exception('Server did not respond')
+                
+                serv_response = await serv_response.json()
+                # TODO: Update valid_at from server_response
             # END async with
         # END async with
                     
