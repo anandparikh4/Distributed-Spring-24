@@ -24,7 +24,6 @@ async def read():
                       ...
                       {"Stud_id": <high>, ...}]
             "status": "success"
-            "valid_at": <valid_at>
     """
 
     try:
@@ -40,7 +39,7 @@ async def read():
         id_high = int(stud_id.get('high', -1))
 
         # Get the data from the database
-        response_payload = {'data':[], 'status': 'success', 'valid_at': valid_at}
+        response_payload = {'data':[], 'status': 'success'}
         async with pool.acquire() as connection:
             async with connection.transaction():
 

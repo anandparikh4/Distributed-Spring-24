@@ -13,7 +13,7 @@ async def server_config():
         Assigns the list of shards whose data the server must store
 
         Request payload:
-            "shard_list" : ["sh0" , "sh1" , "sh2" ...]
+            "shards" : ["sh0" , "sh1" , "sh2" ...]
         
         Response payload:
             "status" : "success"
@@ -28,7 +28,7 @@ async def server_config():
         payload: dict = await request.get_json()
         ic(payload)
 
-        shard_list: list = payload.get("shard_list", [])
+        shard_list: list = payload.get("shards", [])
 
         # Add to the database
         response_payload = {}

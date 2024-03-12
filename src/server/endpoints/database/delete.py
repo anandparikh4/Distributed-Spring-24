@@ -28,6 +28,7 @@ async def delete():
     try:
         # Get the request payload
         payload: dict = await request.get_json()
+        ic(payload)
 
         valid_at = int(payload.get('valid_at', -1))
         shard_id = str(payload.get('shard', -1))
@@ -71,7 +72,7 @@ async def delete():
             "valid_at": term
         }
 
-        return jsonify(response_payload), 200
+        return jsonify(ic(response_payload)), 200
     
     except Exception as e:
         print(f'{Fore.RED}ERROR | '

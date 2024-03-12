@@ -23,7 +23,6 @@ async def copy():
             "sh2": [data]
             ...
             "status": "success"
-            "valid_at": <valid_at>
 
         Error payload:
             "status": "error"
@@ -71,7 +70,7 @@ async def copy():
                     response_payload[shard_id].append(record)
 
         response_payload['status'] = 'success'
-        response_payload['valid_at'] = valid_at
+
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:

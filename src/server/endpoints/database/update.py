@@ -28,6 +28,7 @@ async def data_write():
 
     try:
         payload: dict = await request.get_json()
+        ic(payload)
 
         valid_at = int(payload.get('valid_at', -1))
         shard_id = str(payload.get('shard', -1))
@@ -78,7 +79,7 @@ async def data_write():
             "status": "success"
         }
 
-        return jsonify(response_payload), 200
+        return jsonify(ic(response_payload)), 200
     
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
