@@ -74,7 +74,7 @@ async def write():
                     '''
                     UPDATE TABLE ShardT
                     SET valid_at=($2::int) 
-                    WHERE shard_id=($1:int)
+                    WHERE shard_id=($1::int)
                     '''
                 )
                 async with conn.transaction():

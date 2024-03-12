@@ -63,53 +63,55 @@ async def delete():
                     '''
                     UPDATE TABLE ShardT
                     SET valid_at=($2::int) 
-                    WHERE shard_id=($1:int)
+                    WHERE shard_id=($1::int)
                     '''
                 )
-                server_names = shard_map[shard_id] # TODO: Change to ConsistentHashMap
-                async with shard_locks[shard_id](Read):
-                    async def wrapper(
-                        session: aiohttp.ClientSession,
-                        server_name: str,
-                        json_payload: dict
-                    ):
-    
-                        # To allow other tasks to run
-                        await asyncio.sleep(0)
-    
-                        async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
-                            await response.read()
-    
-                            return response
+                async with conn.transaction():
+                    server_names = shard_map[shard_id] # TODO: Change to ConsistentHashMap
+                    async with shard_locks[shard_id](Read):
+                        async def wrapper(
+                            session: aiohttp.ClientSession,
+                            server_name: str,
+                            json_payload: dict
+                        ):
+        
+                            # To allow other tasks to run
+                            await asyncio.sleep(0)
+        
+                            async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
+                                await response.read()
+        
+                                return response
                         # END wrapper
-    
-                    # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        tasks = [asyncio.create_task(wrapper(
-                            session, 
-                            server_name, 
-                            json_payload={
-                                "shard": shard_id,
-                                "stud_id": stud_id,
-                                "valid_at": shard_valid_at
-                            }
-                        )) for server_name in server_names]
-                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                        serv_response = serv_response[0] if not isinstance(
-                            serv_response[0], BaseException) else None
+        
+                        # Convert to aiohttp request
+                        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                        async with aiohttp.ClientSession(timeout=timeout) as session:
+                            tasks = [asyncio.create_task(wrapper(
+                                session, 
+                                server_name, 
+                                json_payload={
+                                    "shard": shard_id,
+                                    "stud_id": stud_id,
+                                    "valid_at": shard_valid_at
+                                }
+                            )) for server_name in server_names]
+                            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                            serv_response = serv_response[0] if not isinstance(
+                                serv_response[0], BaseException) else None
+                        # END async with
+        
+                        if serv_response is None:
+                            raise Exception('Server did not respond')
+                        
+                        serv_response: dict = await serv_response.json()
+                        cur_valid_at = serv_response.get("valid_at", -1)
+                        if cur_valid_at == -1:
+                            raise Exception('Server response did not contain valid_at field')
+                        max_valid_at = max(max_valid_at, cur_valid_at)
                     # END async with
-    
-                    if serv_response is None:
-                        raise Exception('Server did not respond')
-                    
-                    serv_response: dict = await serv_response.json()
-                    cur_valid_at = serv_response.get("valid_at", -1)
-                    if cur_valid_at == -1:
-                        raise Exception('Server response did not contain valid_at field')
-                    max_valid_at = max(max_valid_at, cur_valid_at)
+                    stmt.execute(shard_id, max_valid_at)
                 # END async with
-                stmt.execute(shard_id, max_valid_at)
             # END async with
         # END async with
                     
