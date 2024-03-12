@@ -27,7 +27,7 @@ async def write():
 
     try:
         # Get the request payload
-        payload: dict = await request.get_json()
+        payload = dict(await request.get_json())
         ic(payload)
 
         if payload is None:
@@ -103,7 +103,7 @@ async def write():
                             async def wrapper(
                                 session: aiohttp.ClientSession,
                                 server_name: str,
-                                json_payload: dict
+                                json_payload: Dict
                             ):
                                 # To allow other tasks to run
                                 await asyncio.sleep(0)

@@ -33,7 +33,7 @@ async def read():
 
     try:
         # Get the request payload
-        payload: Dict = await request.get_json()
+        payload = dict(await request.get_json())
         ic(payload)
 
         if payload is None:
@@ -92,7 +92,7 @@ async def read():
                         async def wrapper(
                             session: aiohttp.ClientSession,
                             server_name: str,
-                            json_payload: dict
+                            json_payload: Dict
                         ):
 
                             # To allow other tasks to run

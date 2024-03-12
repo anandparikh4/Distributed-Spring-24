@@ -63,7 +63,7 @@ async def add():
 
     try:
         # Get the request payload
-        payload: Dict = await request.get_json()
+        payload = dict(await request.get_json())
         ic(payload)
 
         if payload is None:
@@ -349,7 +349,7 @@ async def copy_shards_to_container(
     async def post_write_wrapper(
         session: aiohttp.ClientSession,
         hostname: str,
-        payload: Dict[str, Any],
+        payload: Dict,
     ):
         # Allow other tasks to run
         await asyncio.sleep(0)

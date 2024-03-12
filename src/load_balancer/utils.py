@@ -79,7 +79,7 @@ async def add_shards(
     async def server_config_post_wrapper(
         session: aiohttp.ClientSession,
         server_name: str,
-        payload: dict
+        payload: Dict
     ):
         # To allow other tasks to run
         await asyncio.sleep(0)

@@ -31,7 +31,7 @@ async def update():
 
     try:
         # Get the request payload
-        payload: Dict = await request.get_json()
+        payload = dict(await request.get_json())
         ic(payload)
 
         if payload is None:
