@@ -62,52 +62,6 @@ def get_container_config(
     }
 
 
-async def add_shards(
-    hostname: str,
-    shards: list[str]
-):
-    """
-    Call the /config endpoint of the server replica to add shards.
-
-    `hostname:` server replica hostname
-    `shards:` list of shard names to add
-    """
-
-    # To allow other tasks to run
-    await asyncio.sleep(0)
-
-    async def server_config_post_wrapper(
-        session: aiohttp.ClientSession,
-        server_name: str,
-        payload: Dict
-    ):
-        # To allow other tasks to run
-        await asyncio.sleep(0)
-
-        async with session.post(f'http://{server_name}:5000/config',
-                                json=payload) as response:
-            await response.read()
-
-        return response
-    # END server_config_post_wrapper
-
-    # Convert to aiohttp request
-    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        payload = {'shards': shards}
-        tasks = [asyncio.create_task(
-            server_config_post_wrapper(session, hostname, payload))]
-        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-        serv_response = serv_response[0] if not isinstance(
-            serv_response[0], BaseException) else None
-    # END async with
-
-    if serv_response is None:
-        raise Exception('Server did not respond. Failed to add shards')
-
-# END add_shards
-
-
 async def handle_flatline(
     serv_id: int,
     hostname: str
