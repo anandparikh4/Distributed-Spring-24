@@ -129,8 +129,8 @@ async def read():
                                 serv_response[0], BaseException) else None
                         # END async with aiohttp.ClientSession(timeout=timeout) as session
 
-                        if serv_response is None:
-                            raise Exception('Server did not respond')
+                        if serv_response is None or serv_response.status != 200:
+                            raise Exception('Failed to read data entry')
 
                         serv_response = dict(await serv_response.json())
                         data.extend(serv_response["data"])

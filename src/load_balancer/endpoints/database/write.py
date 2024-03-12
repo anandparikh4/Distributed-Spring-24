@@ -113,7 +113,6 @@ async def write():
                         # TODO: Chage to ConsistentHashMap
                         server_names = shard_map[shard_id]
 
-                        max_valid_at = shard_data[shard_id][1]
                         async with shard_locks[shard_id](Write):
                             # Convert to aiohttp request
                             timeout = aiohttp.ClientTimeout(
@@ -130,17 +129,21 @@ async def write():
                                         }
                                     )) for server_name in server_names]
                                 serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                                serv_response = serv_response[0] if not isinstance(
-                                    serv_response[0], BaseException) else None
-                            # END async with aiohttp.ClientSession(timeout=timeout) as session
+                                serv_response = [None if isinstance(r, BaseException)
+                                                 else r for r in serv_response]
+                            # END async with aiohttp.ClientSession
 
-                            if serv_response is None:
-                                raise Exception('Server did not respond')
+                            max_valid_at = shard_data[shard_id][1]
+                            # If all replicas are not updated, then return an error
+                            for r in serv_response:
+                                if r is None or r.status != 200:
+                                    raise Exception(
+                                        'Failed to write all data entries')
 
-                            serv_response = dict(await serv_response.json())
-                            cur_valid_at = int(serv_response["valid_at"])
-
-                            max_valid_at = max(max_valid_at, cur_valid_at)
+                                resp = dict(await r.json())
+                                cur_valid_at = int(resp["valid_at"])
+                                max_valid_at = max(max_valid_at, cur_valid_at)
+                            # END for r in serv_response
 
                             await update_shard_info_stmt.executemany([(shard_id, max_valid_at)])
                         # END async with shard_locks[shard_id](Write)
