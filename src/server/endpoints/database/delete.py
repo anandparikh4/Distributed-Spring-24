@@ -5,23 +5,22 @@ import sys
 from consts import *
 from common import *
 
-blueprint = Blueprint('update', __name__)
+blueprint = Blueprint('delete', __name__)
 
-@blueprint.route('/update', methods=['POST'])
-async def data_write():
+@blueprint.route('/delete', methods=['DELETE'])
+async def delete():
     """
-        Update data entries in the database
+        Delete data entries from the database
 
         Request payload:
-            "shard" : <shard_id>
-            "stud_id" : <stud_id>
-            "data" : {"stud_id": <stud_id>, "stud_name": <stud_name>, "stud_marks": <stud_marks>}
+            "shard"     : <shard_id>
+            "stud_id"   : <stud_id>
             "valid_idx" : <valid_idx>
 
         Response payload:
-            "message": Data entry for stud_id:<stud_id> updated
-            "curr_idx": <curr_idx>
-            "status": "success"
+            "message"  : Data entry with stud_id:<stud_id> removed
+            "status"   : "success"
+            "valid_idx" : <valid_idx>
             
     """
 
@@ -35,20 +34,24 @@ async def data_write():
         # TBD: Apply rules, also increase the term if required
 
         shard_id = int(payload.get('shard', -1))
-        data: dict = payload.get('data', [])
-        
+        stud_id = int(payload.get('stud_id', -1))
 
-        # Insert the data into the database
+        # Delete data from the database
         async with current_app.pool.acquire() as connection:
             async with connection.transaction():
-                stmt = None
-                
+                stmt = connection.prepare('''
+                    UPDATE StudT
+                    SET deleted_at = $1
+                    WHERE Stud_id = $2 
+                    AND shard_id = $3;
+                ''')
+                await stmt.execute(term, stud_id, shard_id)
 
         # Send the response
         response_payload = {
-            "message": f"Data entry for stud_id:{data['Stud_id']} updated",
-            "curr_idx": term,
-            "status": "success"
+            "message": f'Data entry with Stud_id:{stud_id} removed',
+            "status": "success",
+            "valid_idx": term
         }
 
         return jsonify(response_payload), 200

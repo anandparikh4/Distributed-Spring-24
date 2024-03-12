@@ -15,25 +15,32 @@ async def copy():
         Request payload:
             "shards": ["sh1", "sh2"...]
             "admin": true/false
+            "valid_idx": <valid_idx>
         
         Response payload:
             "sh1": [data]
             "sh2": [data]
             ...
             "status": "success"
+            "valid_idx": <valid_idx>
 
         Error payload:
             "status": "error"
             "message": "error message"
             
     """
+    global term
 
     try:
         # Get the shard ids
         payload = await request.get_json()
         ic(payload)
 
-        shards = payload.get('shards', [])
+        valid_idx = int(payload.get('valid_idx', -1))
+
+        # TBD: Apply rules
+
+        shards: list = payload.get('shards', [])
         admin = False
         if payload.get('admin', '').lower() == 'true':
             admin = True
@@ -50,7 +57,7 @@ async def copy():
                     ''')
                 else:           # If not admin, return only data
                     stmt = connection.prepare('''
-                        SELECT stud_id, stud_name, stud_marks FROM StudT WHERE shard_id = ANY($1::varchar[]);
+                        SELECT Stud_id, Stud_name, Stud_marks FROM StudT WHERE shard_id = ANY($1::varchar[]);
                     ''')
 
                 async for record in stmt.cursor(shards):
@@ -62,6 +69,7 @@ async def copy():
                         response_payload[shard_id] = [record]
 
         response_payload['status'] = 'success'
+        response_payload['valid_idx'] = term
         return jsonify(ic(response_payload)), 200
     
     except Exception as e:
