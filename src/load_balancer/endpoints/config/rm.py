@@ -52,7 +52,7 @@ async def rm():
 
     try:
         # Get the request payload
-        payload: Dict[str, Any] = await request.get_json()
+        payload: Dict = await request.get_json()
         ic(payload)
 
         if payload is None:

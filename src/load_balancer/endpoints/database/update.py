@@ -43,7 +43,7 @@ async def update():
         if stud_id == -1:
             raise Exception('Payload does not contain `stud_id` field')
 
-        data: Dict = payload.get('data', {})
+        data = dict(payload.get('data', {}))
 
         if len(data) == 0:
             raise Exception('Payload does not contain `data` field')
