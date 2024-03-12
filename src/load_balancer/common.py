@@ -1,15 +1,27 @@
+import asyncio
+import random
 import sys
+import time
+from datetime import (datetime as dt,
+                      timezone as tz)
 
+
+import aiohttp
+import asyncpg
 from aiodocker import Docker
 from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
+from typing import List, Dict, Any, Tuple, Set
 
 from consts import *
 from hash import ConsistentHashMap, requestHashList, serverHashList
 
 # Lock to protect the replicas list
 lock = FifoLock()
+
+# Postgres connection pool
+pool: asyncpg.Pool[asyncpg.Record]
 
 # Configure icecream output
 ic.configureOutput(prefix='[LB] | ')
@@ -18,6 +30,7 @@ ic.configureOutput(prefix='[LB] | ')
 if not DEBUG:
     ic.disable()
 
+
 # List to store web server replica hostnames
 replicas = ConsistentHashMap(
     request_hash=requestHashList[HASH_NUM],
@@ -25,19 +38,21 @@ replicas = ConsistentHashMap(
 
 
 # Map to store heartbeat fail counts for each server replica.
-heartbeat_fail_count: dict[str, int] = {}
+heartbeat_fail_count: Dict[str, int] = {}
 
 
 # server ids
-serv_ids = {
-    "Server-0": 123456,
-    "Server-1": 234567,
-    "Server-2": 345678,
+serv_ids: Dict[str, int] = {
+    # "Server-0": 123456,
+    # "Server-1": 234567,
+    # "Server-2": 345678,
 }  # Already 3 servers running
 
 
 # Shard Name to ConsistentHashMap
-shard_map: dict[str, list[str]] = {"sh1":[]} # TODO: change list[str] to ConsistentHashMap
+# To be filled by the load balancer with use
+shard_map: Dict[str, List[str]] = {}
 
-# Shard Name to Shard Lock
-shard_locks: dict[str, FifoLock] = {}
+# Shard Name to FifoLock
+# To be filled by the load balancer with use
+shard_locks: Dict[str, FifoLock] = {}

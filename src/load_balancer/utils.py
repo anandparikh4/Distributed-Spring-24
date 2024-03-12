@@ -1,11 +1,5 @@
-import asyncio
-import random
-import time
-
-import aiohttp
-import asyncpg
-
 from common import *
+from endpoints.config.add import copy_shards_to_container
 
 
 class Read(asyncio.Future):
@@ -43,38 +37,75 @@ def err_payload(err: Exception):
 # END err_payload
 
 
-async def gather_with_concurrency(
-    session: aiohttp.ClientSession,
-    batch: int,
-    *urls: str
+def get_container_config(
+    serv_id: int,
+    hostname: str
 ):
     """
-    Gather with concurrency from aiohttp async session
+    Get the container config for the server replica.
     """
 
-    # Allow other tasks to run
+    return {
+        'image': 'server:v2',
+        'detach': True,
+        'env': [
+            f'SERVER_ID={serv_id:06}',
+            'DEBUG=true',
+            'POSTGRES_HOST=localhost',
+            'POSTGRES_PORT=5432',
+            'POSTGRES_USER=postgres',
+            'POSTGRES_PASSWORD=postgres',
+            'POSTGRES_DB_NAME=postgres',
+        ],
+        'hostname': hostname,
+        'tty': True,
+    }
+
+
+async def add_shards(
+    hostname: str,
+    shards: list[str]
+):
+    """
+    Call the /config endpoint of the server replica to add shards.
+
+    `hostname:` server replica hostname
+    `shards:` list of shard names to add
+    """
+
+    # To allow other tasks to run
     await asyncio.sleep(0)
 
-    semaphore = asyncio.Semaphore(batch)
-
-    async def fetch(url: str):
-        # Allow other tasks to run
+    async def server_config_post_wrapper(
+        session: aiohttp.ClientSession,
+        server_name: str,
+        payload: dict
+    ):
+        # To allow other tasks to run
         await asyncio.sleep(0)
 
-        async with semaphore:
-            async with session.get(url) as response:
-                await response.read()
+        async with session.post(f'http://{server_name}:5000/config',
+                                json=payload) as response:
+            await response.read()
 
-            return response
-        # END async with semaphore
-    # END fetch
+        return response
+    # END server_config_post_wrapper
 
-    tasks = [fetch(url) for url in urls]
+    # Convert to aiohttp request
+    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        payload = {'shards': shards}
+        tasks = [asyncio.create_task(
+            server_config_post_wrapper(session, hostname, payload))]
+        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+        serv_response = serv_response[0] if not isinstance(
+            serv_response[0], BaseException) else None
+    # END async with
 
-    return [None if isinstance(r, BaseException)
-            else r for r in
-            await asyncio.gather(*tasks, return_exceptions=True)]
-# END gather_with_concurrency
+    if serv_response is None:
+        raise Exception('Server did not respond. Failed to add shards')
+
+# END add_shards
 
 
 async def handle_flatline(
@@ -96,14 +127,7 @@ async def handle_flatline(
 
     try:
         async with Docker() as docker:
-            container_config = {
-                'image': 'server:v1',
-                'detach': True,
-                'env': [f'SERVER_ID={serv_id}',
-                        'DEBUG=true'], # TODO: add more envs
-                'hostname': hostname,
-                'tty': True,
-            }
+            container_config = get_container_config(serv_id, hostname)
 
             # create the container
             container = await docker.containers.create_or_replace(
@@ -136,6 +160,20 @@ async def handle_flatline(
                       f'{Style.RESET_ALL}',
                       file=sys.stderr)
         # END async with docker
+
+        # Copy shards to the new containers
+        shards = [shard
+                  for shard, servers in shard_map.items()
+                  if hostname in servers]
+
+        semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+        # Define task to copy shards to the new container
+        task = asyncio.create_task(
+            copy_shards_to_container(hostname, shards, semaphore))
+
+        # Wait for task to complete
+        await asyncio.gather(*[task], return_exceptions=True)
 
     except Exception as e:
         if DEBUG:
@@ -181,15 +219,32 @@ async def get_heartbeats():
                 hostnames = replicas.getServerList().copy()
             # END async with lock(Read)
 
-            # Generate heartbeat urls
-            heartbeat_urls = [f'http://{server_name}:5000/heartbeat'
-                              for server_name in hostnames]
+            semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+            async def collect_heartbeat(
+                session: aiohttp.ClientSession,
+                server_name: str,
+            ):
+
+                # Allow other tasks to run
+                await asyncio.sleep(0)
+
+                async with semaphore:
+                    async with session.get(f'http://{server_name}:5000/heartbeat') as response:
+                        await response.read()
+
+                    return response
+                # END async with semaphore
+            # END collect_heartbeats
 
             # Convert to aiohttp request
             timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                heartbeats = await gather_with_concurrency(
-                    session, REQUEST_BATCH_SIZE, *heartbeat_urls)
+                tasks = [asyncio.create_task(collect_heartbeat(session, server_name))
+                         for server_name in hostnames]
+                heartbeats = await asyncio.gather(*tasks, return_exceptions=True)
+                heartbeats = [None if isinstance(heartbeat, BaseException)
+                              else heartbeat for heartbeat in heartbeats]
             # END async with session
 
             # To allow other tasks to run
@@ -197,7 +252,7 @@ async def get_heartbeats():
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-            async def wrapper(
+            async def handle_flatline_wrapper(
                 serv_id: int,
                 server_name: str
             ):
@@ -215,7 +270,7 @@ async def get_heartbeats():
                                   file=sys.stderr)
                     # END try-except
                 # END async with semaphore
-            # END wrapper
+            # END handle_flatline_wrapper
 
             flatlines = []
 
@@ -229,7 +284,8 @@ async def get_heartbeats():
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
                             serv_id = serv_ids[hostnames[i]]
-                            flatlines.append(wrapper(serv_id, hostnames[i]))
+                            flatlines.append(
+                                handle_flatline_wrapper(serv_id, hostnames[i]))
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0
@@ -265,9 +321,16 @@ async def create_db_pool():
     )
 
     if pool is None:
-        print(f'Failed to connect to database at {DB_HOST}:{DB_PORT}',
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to create database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
+              f'{Style.RESET_ALL}',
               file=sys.stderr)
         sys.exit(1)
+    else:
+        print(f'{Fore.LIGHTGREEN_EX}DB | '
+              f'Created database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
 
     return pool
 # END create_db_pool

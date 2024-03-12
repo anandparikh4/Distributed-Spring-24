@@ -1,6 +1,5 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('rep', __name__)
@@ -21,6 +20,7 @@ async def rep():
     global replicas
 
     async with lock(Read):
+
         # Return the response payload
         return jsonify(ic({
             'message': {

@@ -1,6 +1,3 @@
-import asyncio
-
-import asyncpg
 from quart import Quart
 
 from endpoints import blueprint as all_blueprints
@@ -17,29 +14,39 @@ async def my_startup():
     Start heartbeat background task.
     """
 
-    # Register the blueprints
-    app.register_blueprint(all_blueprints)
+    global pool
 
-    # Register the heartbeat background task
-    app.add_background_task(get_heartbeats)
+    try:
+        # Register the blueprints
+        app.register_blueprint(all_blueprints)
 
-    # Connect to the database
-    app.pool = await asyncpg.create_pool(  # type: ignore
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+        # Register the heartbeat background task
+        app.add_background_task(get_heartbeats)
 
-    if app.pool is None:  # type: ignore
+        # Connect to the database
+        pool = asyncpg.create_pool(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT,
+        )
+
+        await pool
+    except Exception as e:
         print(f'{Fore.RED}ERROR | '
-              f'Failed to connect to the database'
+              f'{e}'
               f'{Style.RESET_ALL}',
               file=sys.stderr)
-        sys.exit(1)
-    # END if
 
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to start the server. Exiting...'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        # Exit the program
+        sys.exit(1)
+    # END try-except
 # END my_startup
 
 
@@ -52,13 +59,16 @@ async def my_shutdown():
     2. Stop all server replicas.
     """
 
+    global replicas
+    global pool
+
     # Stop the heartbeat background task
     app.background_tasks.pop().cancel()
 
     # Stop all server replicas
     semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
-    async def wrapper(
+    async def stop_and_delete_container(
         docker: Docker,
         server_name: str
     ):
@@ -85,16 +95,16 @@ async def my_shutdown():
                           file=sys.stderr)
             # END try-except
         # END async with semaphore
-    # END wrapper
+    # END stop_and_delete_container
 
     async with Docker() as docker:
-        tasks = [wrapper(docker, server_name)
+        tasks = [stop_and_delete_container(docker, server_name)
                  for server_name in replicas.getServerList()]
         await asyncio.gather(*tasks, return_exceptions=True)
     # END async with Docker
 
     # close the pool
-    await app.pool.close()  # type: ignore
+    await pool.close()
 # END my_shutdown
 
 
