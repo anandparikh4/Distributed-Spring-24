@@ -1,6 +1,5 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify, request
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('delete', __name__)
@@ -35,9 +34,9 @@ async def delete():
             raise Exception('Payload is empty')
 
         # Get the required fields from the payload and check for errors
-        stud_id: Dict = payload.get('stud_id', {})
+        stud_id = int(payload.get('stud_id', -1))
 
-        if len(stud_id) == 0:
+        if stud_id == -1:
             raise Exception('Payload does not contain `stud_id` field')
 
         # Get the shard name containing the entry
@@ -58,8 +57,8 @@ async def delete():
 
             async with conn.transaction():
                 async for record in stmt.cursor(stud_id):
-                    shard_id = record["shard_id"]
-                    shard_valid_at = record["valid_at"]
+                    shard_id: str = record["shard_id"]
+                    shard_valid_at: int = record["valid_at"]
 
         if not shard_id:
             raise Exception(f'stud_id {stud_id} does not exist')
@@ -93,7 +92,7 @@ async def delete():
                             async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
                                 await response.read()
 
-                                return response
+                            return response
                         # END wrapper
 
                         # Convert to aiohttp request

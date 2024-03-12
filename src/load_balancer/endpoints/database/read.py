@@ -1,6 +1,5 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify, request
 
-from common import *
 from utils import *
 
 blueprint = Blueprint('read', __name__)
@@ -72,8 +71,8 @@ async def read():
                 FROM
                     ShardT
                 WHERE
-                    (stud_id_low <= ($2::int)) AND
-                    (($1::int) <= stud_id_low + shard_size)
+                    (stud_id_low <= ($2::INTEGER)) AND
+                    (($1::INTEGER) <= stud_id_low + shard_size)
                 ''')
 
             async with conn.transaction():
