@@ -41,7 +41,7 @@ async def my_shutdown():
     '''
 
     # Close the database connection
-    await app.pool.close()
+    await pool.close()
 
 
 
