@@ -10,21 +10,21 @@ blueprint = Blueprint('write', __name__)
 @blueprint.route('/write', methods=['POST'])
 async def data_write():
     """
-        Returns requested data entries from the server container
+        Write data entries to the database
 
         Request payload:
-            "shard" : "sh1"
-            "data" : [{"stud_id": low, ...},
-                      {"stud_id": low+1, ...},
+            "shard" : <shard_id>
+            "data" : [{"stud_id": <id1>, ...},
+                      {"stud_id": <id2>, ...},
                       ...
-                      {"stud_id": high, ...}]
+                      {"stud_id": <idn>, ...}]
             "admin": true/false
-            "valid_idx" : valid_idx
+            "valid_idx" : <valid_idx>
 
         Response payload:
-        "message": Data entries added
-        "curr_idx": <curr_idx>
-        "status": "success"
+            "message": Data entries added
+            "valid_idx": <valid_idx>
+            "status": "success"
             
     """
 
@@ -37,8 +37,8 @@ async def data_write():
 
         # TBD: Apply rules, also increase the term if required
 
-        shard_id = payload.get('shard_id', -1)
-        data = payload.get('data', [])
+        shard_id = int(payload.get('shard', -1))
+        data: list = payload.get('data', [])
 
         admin = False
         if payload.get('admin', '').lower() == 'true':
@@ -70,7 +70,7 @@ async def data_write():
         # Send the response
         response_payload = {
             "message": "Data entries added",
-            "curr_idx": term,
+            "valid_idx": term,
             "status": "success"
         }
 

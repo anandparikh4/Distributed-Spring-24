@@ -13,29 +13,31 @@ async def data_read():
         Returns requested data entries from the server container
 
         Request payload:
-            "shard_id" : "sh1"
-            "stud_id"  : {"low": low, "high": high}
-            "valid_idx": valid_idx
+            "shard"     : <shard_id>
+            "Stud_id"   : {"low": <low>, "high": <high>}
+            "valid_idx" : <valid_idx>
 
         Response payload:
-            "data" : [{"stud_id": low, ...},
-                      {"stud_id": low+1, ...},
+            "data" : [{"Stud_id": <low>, ...},
+                      {"Stud_id": <low+1>, ...},
                       ...
-                      {"stud_id": high, ...}]
+                      {"Stud_id": <high>, ...}]
             "status": "success"
+            "valid_idx": <valid_idx>
     """
+    global term
 
     try:
         # Get the shard id and the range of stud_ids
         payload: dict = await request.get_json()
         ic(payload)
 
-        valid_idx = payload.get('valid_idx', -1)
+        valid_idx = int(payload.get('valid_idx', -1))
 
         # TBD: Apply rules
 
-        shard_id = payload.get('shard_id', -1)
-        stud_id : dict = payload.get('stud_id', {})
+        shard_id = int(payload.get('shard', -1))
+        stud_id : dict = payload.get('Stud_id', {})
 
         id_low = stud_id.get('low', -1)
         id_high = stud_id.get('high', -1)
@@ -45,15 +47,16 @@ async def data_read():
         async with current_app.pool.acquire() as connection:
             async with connection.transaction():
                 stmt = connection.prepare('''
-                    SELECT stud_id, stud_name, stud_marks FROM StudT
+                    SELECT Stud_id, Stud_name, Stud_marks FROM StudT
                     WHERE shard_id = $1
-                    AND stud_id BETWEEN $2 AND $3;
+                    AND Stud_id BETWEEN $2 AND $3;
                 ''')
                 response_payload['data'] = []
                 async for record in stmt.cursor(shard_id, id_low, id_high):
                     response_payload['data'].append(dict(record))
 
         response_payload['status'] = 'success'
+        response_payload['valid_idx'] = term
 
         return jsonify(ic(response_payload)), 200
     
