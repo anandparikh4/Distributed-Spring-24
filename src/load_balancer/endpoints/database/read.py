@@ -31,6 +31,24 @@ async def read():
         `status: status of the request`
     """
 
+    await asyncio.sleep(0)
+
+    async def read_get_wrapper(
+        session: aiohttp.ClientSession,
+        server_name: str,
+        json_payload: Dict
+    ):
+
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with session.get(f'http://{server_name}:5000/read',
+                               json=json_payload) as response:
+            await response.read()
+
+        return response
+    # END read_get_wrapper
+
     try:
         # Get the request payload
         payload = dict(await request.get_json())
@@ -62,53 +80,42 @@ async def read():
         shard_ids: list[str] = []
         shard_valid_ats: list[int] = []
 
-        async with pool.acquire() as conn:
-            stmt = await conn.prepare(
-                '''--sql
-                SELECT
-                    shard_id,
-                    valid_at
-                FROM
-                    ShardT
-                WHERE
-                    (stud_id_low <= ($2::INTEGER)) AND
-                    (($1::INTEGER) <= stud_id_low + shard_size)
-                ''')
-
-            async with conn.transaction():
-                async for record in stmt.cursor(low, high):
-                    shard_ids.append(record["shard_id"])
-                    shard_valid_ats.append(record["valid_at"])
-
-        data = []
-
         async with lock(Read):
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    record = await conn.fetchrow(
+                        '''--sql
+                        SELECT
+                            shard_id,
+                            valid_at
+                        FROM
+                            ShardT
+                        WHERE
+                            (stud_id_low <= ($1::INTEGER)) AND
+                            (($1::INTEGER) <= stud_id_low + shard_size)
+                        ''',
+                        stud_id)
+
+                    if record is None:
+                        raise Exception(f'stud_id {stud_id} does not exist')
+
+                    shard_id: str = record["shard_id"]
+                    shard_valid_at: int = record["valid_at"]
+                # END async with conn.transaction()
+            # END async with pool.acquire()
+
+            data = []
+
             for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
                 if len(shard_map[shard_id]) > 0:
                     # TODO: Change to ConsistentHashMap
                     server_name = shard_map[shard_id][0]
 
                     async with shard_locks[shard_id](Read):
-                        async def wrapper(
-                            session: aiohttp.ClientSession,
-                            server_name: str,
-                            json_payload: Dict
-                        ):
-
-                            # To allow other tasks to run
-                            await asyncio.sleep(0)
-
-                            async with session.post(f'http://{server_name}:5000/read', json=json_payload) as response:
-                                await response.read()
-
-                            return response
-                        # END wrapper
-
-                         # Convert to aiohttp request
-                        timeout = aiohttp.ClientTimeout(
-                            connect=REQUEST_TIMEOUT)
+                        # Convert to aiohttp request
+                        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(wrapper(
+                            tasks = [asyncio.create_task(read_get_wrapper(
                                 session,
                                 server_name,
                                 json_payload={
@@ -120,17 +127,17 @@ async def read():
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                             serv_response = serv_response[0] if not isinstance(
                                 serv_response[0], BaseException) else None
-                        # END async with
+                        # END async with aiohttp.ClientSession(timeout=timeout) as session
 
                         if serv_response is None:
                             raise Exception('Server did not respond')
 
                         serv_response = dict(await serv_response.json())
-                        data.extend(serv_response.get("data", []))
-                    # END async with
-                # END if
-            # END for
-        # END async with
+                        data.extend(serv_response["data"])
+                    # END async with shard_locks[shard_id](Read)
+                # END if len(shard_map[shard_id]) > 0
+            # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
+        # END async with lock(Read)
 
         # Return the response payload
         return jsonify(ic({

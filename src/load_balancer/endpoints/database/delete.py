@@ -25,6 +25,22 @@ async def delete():
         `status: status of the request`
     """
 
+    await asyncio.sleep(0)
+
+    async def del_put_wrapper(
+        session: aiohttp.ClientSession,
+        server_name: str,
+        json_payload: Dict
+    ):
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
+            await response.read()
+
+        return response
+    # END del_put_wrapper
+
     try:
         # Get the request payload
         payload = dict(await request.get_json())
@@ -40,66 +56,38 @@ async def delete():
             raise Exception('Payload does not contain `stud_id` field')
 
         # Get the shard name containing the entry
-        # shard_id, shard_valid_at = 0, 0
-
-        async with pool.acquire() as conn:
-            stmt = await conn.prepare(
-                '''--sql
-                SELECT
-                    shard_id,
-                    valid_at
-                FROM
-                    ShardT
-                WHERE
-                    (stud_id_low <= ($1::INTEGER)) AND
-                    (($1::INTEGER) <= stud_id_low + shard_size)
-                ''')
-
-            async with conn.transaction():
-                async for record in stmt.cursor(stud_id):
-                    shard_id: str = record["shard_id"]
-                    shard_valid_at: int = record["valid_at"]
-
-        if not shard_id:
-            raise Exception(f'stud_id {stud_id} does not exist')
 
         async with lock(Read):
             async with pool.acquire() as conn:
-                stmt = await conn.prepare(
-                    '''--sql
-                    UPDATE
-                        ShardT
-                    SET
-                        valid_at = ($2::INTEGER)
-                    WHERE
-                        shard_id = ($1::INTEGER)
-                    ''')
-
                 async with conn.transaction():
+                    record = await conn.fetchrow(
+                        '''--sql
+                        SELECT
+                            shard_id,
+                            valid_at
+                        FROM
+                            ShardT
+                        WHERE
+                            (stud_id_low <= ($1::INTEGER)) AND
+                            (($1::INTEGER) <= stud_id_low + shard_size)
+                        ''',
+                        stud_id)
+
+                    if record is None:
+                        raise Exception(f'stud_id {stud_id} does not exist')
+
+                    shard_id: str = record["shard_id"]
+                    shard_valid_at: int = record["valid_at"]
+
                     # TODO: Change to ConsistentHashMap
                     server_names = shard_map[shard_id]
 
-                    async with shard_locks[shard_id](Read):
-                        async def wrapper(
-                            session: aiohttp.ClientSession,
-                            server_name: str,
-                            json_payload: Dict
-                        ):
-
-                            # To allow other tasks to run
-                            await asyncio.sleep(0)
-
-                            async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
-                                await response.read()
-
-                            return response
-                        # END wrapper
-
+                    async with shard_locks[shard_id](Write):
                         # Convert to aiohttp request
                         timeout = aiohttp.ClientTimeout(
                             connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(wrapper(
+                            tasks = [asyncio.create_task(del_put_wrapper(
                                 session,
                                 server_name,
                                 json_payload={
@@ -111,22 +99,36 @@ async def delete():
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                             serv_response = serv_response[0] if not isinstance(
                                 serv_response[0], BaseException) else None
-                        # END async with
+                        # END async with aiohttp.ClientSession
 
                         if serv_response is None:
                             raise Exception('Server did not respond')
 
                         serv_response = dict(await serv_response.json())
-                        cur_valid_at = serv_response.get("valid_at", -1)
+                        cur_valid_at = int(serv_response["valid_at"])
+
                         if cur_valid_at == -1:
                             raise Exception(
                                 'Server response did not contain valid_at field')
+
                         max_valid_at = max(shard_valid_at, cur_valid_at)
-                    # END async with
-                    await stmt.executemany([(shard_id, max_valid_at)])
-                # END async with
-            # END async with
-        # END async with
+
+                        await conn.execute(
+                            '''--sql
+                            UPDATE
+                                ShardT
+                            SET
+                                valid_at = ($1::INTEGER)
+                            WHERE
+                                shard_id = ($2::INTEGER)
+                            ''',
+                            max_valid_at,
+                            shard_id,
+                        )
+                    # END async with shard_locks[shard_id](Write)
+                # END async with conn.transaction()
+            # END async with pool.acquire() as conn
+        # END async with lock(Read)
 
         # Return the response payload
         return jsonify(ic({
