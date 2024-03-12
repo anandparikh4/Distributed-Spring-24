@@ -306,14 +306,10 @@ async def copy_shards_to_container(
     async def post_config_wrapper(
         session: aiohttp.ClientSession,
         hostname: str,
-        shards: list[str],
+        payload: Dict,
     ):
         # Allow other tasks to run
         await asyncio.sleep(0)
-
-        payload = {
-            'shards': shards
-        }
 
         async with semaphore:
             async with session.post(f'http://{hostname}:5000/config',
@@ -327,15 +323,10 @@ async def copy_shards_to_container(
     async def get_copy_wrapper(
         session: aiohttp.ClientSession,
         hostname: str,
-        shards: list[str],
+        payload: Dict,
     ):
         # Allow other tasks to run
         await asyncio.sleep(0)
-
-        payload = {
-            'shards': shards,
-            'admin': True,
-        }
 
         async with semaphore:
             async with session.get(f'http://{hostname}:5000/copy',
@@ -363,75 +354,116 @@ async def copy_shards_to_container(
         # END async with semaphore
 
     try:
-        # List of shards to copy from each server A [server A -> list of shards]
-        call_server_shards: Dict[str, List[str]] = {}
+        # List of shards to copy from each server A [server -> list of [shard_id, valid_at]]
+        call_server_shards: Dict[str, List[Tuple[str, int]]] = {}
 
         # For each shard K in `shards`:
-        for shard in shards:
-            # Ignore empty shards
-            if len(shard_map[shard]) == 0:
-                continue
+        async with pool.acquire() as conn:
+            stmt = await conn.prepare(
+                '''--sql
+                SELECT
+                    valid_at
+                FROM
+                    ShardT
+                WHERE
+                    shard_id = $1::TEXT
+                ''')
 
-            # Get server A from `shard_map` for the shard K
-            server = shard_map[shard][0]  # TODO: Add load balancing
+            async with conn.transaction():
+                for shard in shards:
+                    # Ignore empty shards
+                    if len(shard_map[shard]) == 0:
+                        continue
 
-            call_server_shards[server] = call_server_shards.get(server, [])
-            call_server_shards[server].append(shard)
-        # END for shard in shards
+                    # Get server A from `shard_map` for the shard K
+                    # TODO: Chage to ConsistentHashMap
+                    server = shard_map[shard][0]
+
+                    shard_valid_at: int = await stmt.fetchval(shard)
+
+                    if server not in call_server_shards:
+                        call_server_shards[server] = []
+
+                    call_server_shards[server].append((shard, shard_valid_at))
+                # END for shard in shards
+            # END async with conn.transaction()
+        # END async with pool.acquire() as conn
 
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             # Call /config endpoint on the server S with the hostname
             config_task = asyncio.create_task(
-                post_config_wrapper(session, hostname, shards))
-            response = await asyncio.gather(*[config_task], return_exceptions=True)
-            response = None if isinstance(
-                response[0], BaseException) else response[0]
+                post_config_wrapper(
+                    session,
+                    hostname,
+                    payload={
+                        "shards": shards
+                    }
+                )
+            )
+            config_response = await asyncio.gather(*[config_task], return_exceptions=True)
+            config_response = (None if isinstance(config_response[0], BaseException)
+                               else config_response[0])
 
-            if response is None or response.status != 200:
+            if config_response is None or config_response.status != 200:
                 raise Exception(f'Failed to add shards to {hostname}')
 
             # Call /copy on server A to copy the shard K
             # Define tasks
-            tasks = [asyncio.create_task(get_copy_wrapper(
-                session, server, shards))
-                for server, shards in call_server_shards.items()]
+            tasks = [asyncio.create_task(
+                get_copy_wrapper(
+                    session,
+                    server,
+                    payload={
+                        "shards": [shard[0] for shard in shards],
+                        "valid_at": [shard[1] for shard in shards],
+                    }
+                )
+            ) for server, shards in call_server_shards.items()]
 
             # Wait for all tasks to complete
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
-            responses = [None if isinstance(response, BaseException) else response
-                         for response in responses]
+            copy_responses = await asyncio.gather(*tasks, return_exceptions=True)
+            copy_responses = [None if isinstance(response, BaseException)
+                              else response
+                              for response in copy_responses]
 
-            # Get the data from the responses [shard_id -> list of data]
-            all_data: Dict[str, List[Any]] = {}
+            # Get the data from the copy_responses [shard_id -> (list of data, valid_at)]
+            all_data: Dict[str, Tuple[List, int]] = {}
 
-            for (response, server_shards) in zip(responses,
+            for (response, server_shards) in zip(copy_responses,
                                                  call_server_shards.values()):
                 if response is None or response.status != 200:
                     raise Exception(f'Failed to copy shards to {hostname}')
 
                 data: Dict = await response.json()
 
-                for shard in server_shards:
-                    all_data[shard] = data[shard]
-            # END for (response, shards) in zip(responses, call_server_shards.values())
+                for shard_id, valid_at in server_shards:
+                    all_data[shard_id] = (data[shard_id], valid_at)
+            # END for (response, shards) in zip(copy_responses, call_server_shards.values())
 
             # Call /write on server S to write the shard K
             # Define tasks
             tasks = [asyncio.create_task(
-                post_write_wrapper(session, hostname, payload={
-                    'shard': shard,
-                    'data': data,
-                    'admin': True,
-                })) for shard, data in all_data.items()]
+                post_write_wrapper(
+                    session,
+                    hostname,
+                    payload={
+                        'shard': shard,
+                        'data': data,
+                        'admin': True,
+                        'valid_at': valid_at,
+                    }
+                )
+            ) for shard, (data, valid_at) in all_data.items()]
 
             # Wait for all tasks to complete
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
-            responses = [None if isinstance(response, BaseException) else response
-                         for response in responses]
+            write_responses = await asyncio.gather(*tasks, return_exceptions=True)
+            write_responses = [None if isinstance(response, BaseException)
+                               else response
+                               for response in write_responses]
 
             if any(response is None or response.status != 200
-                   for response in responses):
+                   for response in write_responses):
                 raise Exception(f'Failed to write shards to {hostname}')
 
         # END async with aiohttp.ClientSession
