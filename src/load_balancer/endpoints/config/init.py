@@ -78,7 +78,7 @@ async def init():
         for shard in new_shards:
             if not all(k in shard.keys()
                        for k in
-                       ('stud_id_low', 'shard_id', 'shard_size')):
+                       ['stud_id_low', 'shard_id', 'shard_size']):
                 raise Exception('Invalid shard description')
         # END for shard in new_shards
 

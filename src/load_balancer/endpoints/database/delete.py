@@ -35,7 +35,8 @@ async def delete():
         # To allow other tasks to run
         await asyncio.sleep(0)
 
-        async with session.put(f'http://{server_name}:5000/del', json=json_payload) as response:
+        async with session.delete(f'http://{server_name}:5000/del',
+                                  json=json_payload) as response:
             await response.read()
 
         return response
@@ -106,10 +107,6 @@ async def delete():
 
                         serv_response = dict(await serv_response.json())
                         cur_valid_at = int(serv_response["valid_at"])
-
-                        if cur_valid_at == -1:
-                            raise Exception(
-                                'Server response did not contain valid_at field')
 
                         max_valid_at = max(shard_valid_at, cur_valid_at)
 

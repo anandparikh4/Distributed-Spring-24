@@ -29,6 +29,24 @@ async def update():
         `status: status of the request`
     """
 
+    await asyncio.sleep(0)
+
+    async def update_put_wrapper(
+        session: aiohttp.ClientSession,
+        server_name: str,
+        json_payload: dict
+    ):
+
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with session.put(f'http://{server_name}:5000/update',
+                               json=json_payload) as response:
+            await response.read()
+
+        return response
+    # END update_put_wrapper
+
     try:
         # Get the request payload
         payload = dict(await request.get_json())
@@ -48,73 +66,44 @@ async def update():
         if len(data) == 0:
             raise Exception('Payload does not contain `data` field')
 
-        new_stud_id = int(data.get("stud_id", -1))
-        new_stud_name = str(data.get("stud_name", ""))
-        new_stud_marks = int(data.get("stud_marks", -1))
-
-        if new_stud_id == -1 or new_stud_name == "" or new_stud_marks == -1:
-            raise Exception(f'Data is invalid')
-
-        # Get the shard name and valid at containing the entry
-        async with pool.acquire() as conn:
-            stmt = await conn.prepare(
-                '''--sql
-                SELECT
-                    shard_id,
-                    valid_at
-                FROM
-                    ShardT
-                WHERE
-                    (stud_id_low <= ($2::INTEGER)) AND
-                    (($1::INTEGER) <= stud_id_low + shard_size)
-                ''')
-
-            async with conn.transaction():
-                async for record in stmt.cursor(stud_id):
-                    shard_id: str = record["shard_id"]
-                    shard_valid_at: int = record["valid_at"]
-
-        if not shard_id:
-            raise Exception(f'stud_id {stud_id} does not exist')
+        if not all(k in data.keys()
+                   for k in
+                   ["stud_id", "stud_name", "stud_marks"]):
+            raise Exception('Data entry is invalid')
 
         async with lock(Read):
             async with pool.acquire() as conn:
-                stmt = await conn.prepare(
-                    '''--sql
-                    UPDATE
-                        ShardT
-                    SET
-                        valid_at = ($2::INTEGER)
-                    WHERE
-                        shard_id = ($1::INTEGER)
-                    ''')
-
                 async with conn.transaction():
+                    record = await conn.fetchrow(
+                        '''--sql
+                        SELECT
+                            shard_id,
+                            valid_at
+                        FROM
+                            ShardT
+                        WHERE
+                            (stud_id_low <= ($1::INTEGER)) AND
+                            (($1::INTEGER) <= stud_id_low + shard_size)
+                        ''',
+                        stud_id
+                    )
+
+                    if record is None:
+                        raise Exception(f'stud_id {stud_id} does not exist')
+
+                    shard_id: str = record["shard_id"]
+                    shard_valid_at: int = record["valid_at"]
+
                     # TODO: Change to ConsistentHashMap
                     server_names = shard_map[shard_id]
                     max_valid_at = shard_valid_at
 
-                    async with shard_locks[shard_id](Read):
-                        async def wrapper(
-                            session: aiohttp.ClientSession,
-                            server_name: str,
-                            json_payload: dict
-                        ):
-
-                            # To allow other tasks to run
-                            await asyncio.sleep(0)
-
-                            async with session.put(f'http://{server_name}:5000/update', json=json_payload) as response:
-                                await response.read()
-
-                            return response
-                        # END wrapper
-
+                    async with shard_locks[shard_id](Write):
                         # Convert to aiohttp request
                         timeout = aiohttp.ClientTimeout(
                             connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(wrapper(
+                            tasks = [asyncio.create_task(update_put_wrapper(
                                 session,
                                 server_name,
                                 json_payload={
@@ -127,24 +116,32 @@ async def update():
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                             serv_response = serv_response[0] if not isinstance(
                                 serv_response[0], BaseException) else None
-                        # END async with
+                        # END async with aiohttp.ClientSession(timeout=timeout) as session
 
                         if serv_response is None:
                             raise Exception('Server did not respond')
 
                         serv_response = dict(await serv_response.json())
-                        cur_valid_at = int(serv_response.get("valid_at", -1))
-
-                        if cur_valid_at == -1:
-                            raise Exception(
-                                'Server response did not contain valid_at field')
+                        cur_valid_at = int(serv_response["valid_at"])
 
                         max_valid_at = max(max_valid_at, cur_valid_at)
-                    # END async with
-                    await stmt.executemany([(shard_id, max_valid_at)])
-                # END async with
-            # END async with
-        # END async with
+
+                        await conn.execute(
+                            '''--sql
+                            UPDATE
+                                ShardT
+                            SET
+                                valid_at = ($1::INTEGER)
+                            WHERE
+                                shard_id = ($2::INTEGER)
+                            ''',
+                            max_valid_at,
+                            shard_id,
+                        )
+                    # END async with shard_locks[shard_id](Write)
+                # END async with conn.transaction()
+            # END async with pool.acquire() as conn
+        # END async with lock(Read)
 
         # Return the response payload
         return jsonify(ic({
