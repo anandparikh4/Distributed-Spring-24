@@ -1,7 +1,8 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify, request
 from colorama import Fore, Style
 import sys
 
+from rules import rules
 from consts import *
 from common import *
 
@@ -16,38 +17,64 @@ async def data_write():
             "shard" : <shard_id>
             "stud_id" : <stud_id>
             "data" : {"stud_id": <stud_id>, "stud_name": <stud_name>, "stud_marks": <stud_marks>}
-            "valid_idx" : <valid_idx>
+            "valid_at" : <valid_at>
 
         Response payload:
             "message": Data entry for stud_id:<stud_id> updated
-            "curr_idx": <curr_idx>
+            "valid_at": <valid_at>
             "status": "success"
             
     """
 
-    global term
-
     try:
         payload: dict = await request.get_json()
 
-        valid_idx = int(payload.get('valid_idx', -1))
-
-        # TBD: Apply rules, also increase the term if required
-
-        shard_id = int(payload.get('shard', -1))
-        data: dict = payload.get('data', [])
+        valid_at = int(payload.get('valid_at', -1))
+        shard_id = str(payload.get('shard', -1))
+        data = dict(payload.get('data', {}))
         
-
         # Insert the data into the database
-        async with current_app.pool.acquire() as connection:
+        async with pool.acquire() as connection:
             async with connection.transaction():
-                stmt = None
-                
+                term: int = await connection.fetchval('''--sql
+                    SELECT term FROM TermT
+                    WHERE shard_id = $1::TEXT;                         
+                ''', shard_id)
+
+                term = max(term, valid_at) + 1
+
+                await rules(shard_id, valid_at)
+
+                await connection.execute('''--sql
+                    UPDATE StudT
+                    SET deleted_at = $1::INTEGER
+                    WHERE stud_id = $2::INTEGER
+                    AND created_at <= $3::INTEGER
+                    AND shard_id = $4::TEXT;                  
+                ''', term, data['stud_id'], valid_at, shard_id)
+
+                term += 1
+
+                await connection.execute('''--sql
+                    INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at)
+                    VALUES ($1::INTEGER, 
+                            $2::TEXT, 
+                            $3::INTEGER, 
+                            $4::TEXT, 
+                            $5::INTEGER);               
+                ''', data['stud_id'], data['stud_name'], data['stud_marks'], shard_id, term)
+
+                await connection.execute('''--sql
+                    UPDATE TermT
+                    SET term = $1::INTEGER
+                    WHERE shard_id = $2::TEXT;                    
+                ''', term, shard_id)
+    
 
         # Send the response
         response_payload = {
-            "message": f"Data entry for stud_id:{data['Stud_id']} updated",
-            "curr_idx": term,
+            "message": f"Data entry for stud_id:{data['stud_id']} updated",
+            "valid_at": term,
             "status": "success"
         }
 

@@ -13,7 +13,7 @@ async def server_config():
         Assigns the list of shards whose data the server must store
 
         Request payload:
-            "shard_list" : ["sh0" , "sh1" , "sh2"]
+            "shard_list" : ["sh0" , "sh1" , "sh2" ...]
         
         Response payload:
             "status" : "success"
@@ -32,13 +32,14 @@ async def server_config():
 
         # Add to the database
         response_payload = {}
-        async with current_app.pool.acquire() as connection:
+        async with pool.acquire() as connection:
             async with connection.transaction():
-                stmt = connection.prepare('''
-                    INSERT INTO ShardList
-                    SELECT * FROM UNNEST ($1);
+                stmt = await connection.prepare('''--sql
+                    INSERT INTO TermT (shard_id)
+                    VALUES ($1::TEXT);
                 ''')
-                await connection.execute(stmt , shard_list)
+                
+                await stmt.executemany(shard_list)
         
         response_payload['status'] = 'success'
 

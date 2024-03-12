@@ -1,21 +1,22 @@
-from quart import Blueprint, current_app, jsonify, request
+from quart import Blueprint, jsonify, request
 from colorama import Fore, Style
 import sys
 
+from rules import rules
 from consts import *
 from common import *
 
 blueprint = Blueprint('read', __name__)
 
 @blueprint.route('/read', methods=['GET'])
-async def data_read():
+async def read():
     """
         Returns requested data entries from the server container
 
         Request payload:
             "shard"     : <shard_id>
-            "Stud_id"   : {"low": <low>, "high": <high>}
-            "valid_idx" : <valid_idx>
+            "stud_id"  : {"low": <low>, "high": <high>}
+            "valid_at" : <valid_at>
 
         Response payload:
             "data" : [{"Stud_id": <low>, ...},
@@ -23,40 +24,38 @@ async def data_read():
                       ...
                       {"Stud_id": <high>, ...}]
             "status": "success"
-            "valid_idx": <valid_idx>
+            "valid_at": <valid_at>
     """
-    global term
 
     try:
         # Get the shard id and the range of stud_ids
         payload: dict = await request.get_json()
         ic(payload)
 
-        valid_idx = int(payload.get('valid_idx', -1))
+        valid_at = int(payload.get('valid_at', -1))
+        shard_id = str(payload.get('shard', -1))
+        stud_id = dict(payload.get('stud_id', {}))
 
-        # TBD: Apply rules
-
-        shard_id = int(payload.get('shard', -1))
-        stud_id : dict = payload.get('Stud_id', {})
-
-        id_low = stud_id.get('low', -1)
-        id_high = stud_id.get('high', -1)
+        id_low = int(stud_id.get('low', -1))
+        id_high = int(stud_id.get('high', -1))
 
         # Get the data from the database
-        response_payload = {}
-        async with current_app.pool.acquire() as connection:
+        response_payload = {'data':[], 'status': 'success', 'valid_at': valid_at}
+        async with pool.acquire() as connection:
             async with connection.transaction():
-                stmt = connection.prepare('''
-                    SELECT Stud_id, Stud_name, Stud_marks FROM StudT
-                    WHERE shard_id = $1
-                    AND Stud_id BETWEEN $2 AND $3;
-                ''')
-                response_payload['data'] = []
-                async for record in stmt.cursor(shard_id, id_low, id_high):
-                    response_payload['data'].append(dict(record))
 
-        response_payload['status'] = 'success'
-        response_payload['valid_idx'] = term
+                await rules(shard_id, valid_at)
+
+                async for record in connection.cursor('''--sql
+                    SELECT Stud_id, Stud_name, Stud_marks
+                    FROM StudT
+                    WHERE shard_id = $1
+                    AND Stud_id BETWEEN $2 AND $3
+                    AND created_at <= $4;
+                ''', 
+                shard_id, id_low, id_high, valid_at):
+                    
+                    response_payload['data'].append(dict(record))
 
         return jsonify(ic(response_payload)), 200
     

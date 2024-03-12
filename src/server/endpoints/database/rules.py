@@ -1,4 +1,3 @@
-from quart import current_app
 from colorama import Fore, Style
 import sys
 
@@ -6,37 +5,42 @@ from consts import *
 from common import *
 
 # All rules for enforcing synchronization between shard replicas across servers
-# Simply do 'await rules(payload)' in each operation. No return value
+# Simply do 'await rules(shard_id, term)' in each operation. No return value
 
-async def rules(payload: dict = {}):
+
+async def rules(
+    shard_id: str,
+    valid_at: int
+):
     """
-        Rule 1 : Erase all entries where created_at > valid_idx or deleted_at <= valid_idx
+        Rule 1 : Erase all entries where created_at > valid_idx or (deleted_at is not null and deleted_at <= valid_idx)
         Rule 2 : Update deleted_at = null all entries where deleted_at > valid_idx
     """
 
     try:
-        # Get shard id and valid_idx from payload
-        shard_id = payload.get("shard_id", -1)
-        valid_idx = payload.get("valid_idx", -1)
-
         # Enforce rules by executing database operations
-        async with current_app.pool.acquire() as connection:
+        async with pool.acquire() as connection:
             async with connection.transaction():
 
-                rule1 = connection.prepare('''
+                await connection.execute(
+                    '''--sql
                     DELETE FROM StudT
-                    WHERE (shard_id = $1)
-                    AND (created_at > $2 OR deleted_at <= $2);
-                ''')
-                await connection.execute(rule1 , shard_id , valid_idx)
+                    WHERE (shard_id = $1::TEXT)
+                    AND (created_at > $2::INTEGER OR (deleted_at IS NOT NULL AND
+                                                      deleted_at <= $2::INTEGER));
+                    ''',
+                    shard_id,
+                    valid_at)
 
-                rule2 = connection.prepare('''
+                await connection.execute(
+                    '''--sql
                     UPDATE StudT
                     SET deleted_at = NULL
-                    WHERE shard_id = $1
-                    AND deleted_at > $2
-                ''')
-                await connection.execute(rule2 , shard_id , valid_idx)
+                    WHERE shard_id = $1::TEXT
+                    AND deleted_at > $2::INTEGER;
+                    ''',
+                    shard_id,
+                    valid_at)
 
     except Exception as e:
         if DEBUG:
@@ -44,3 +48,4 @@ async def rules(payload: dict = {}):
                   f'{e}'
                   f'{Style.RESET_ALL}',
                   file=sys.stderr)
+        raise e

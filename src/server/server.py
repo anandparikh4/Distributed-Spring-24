@@ -15,12 +15,14 @@ async def my_startup():
     '''
         Run startup tasks
     '''
+    
+    global pool
 
     # Register blueprints
     app.register_blueprint(endpoints_blueprint)
 
     # Connect to the database
-    app.pool = await asyncpg.create_pool(  # type: ignore
+    pool = asyncpg.create_pool(
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
@@ -28,12 +30,8 @@ async def my_startup():
         port=DB_PORT
     )
 
-    if app.pool is None:  # type: ignore
-        print(f'{Fore.RED}ERROR | '
-                f'Failed to connect to the database'
-                f'{Style.RESET_ALL}',
-                file=sys.stderr)
-        sys.exit(1)
+    await pool
+
 
 
 @app.after_serving
