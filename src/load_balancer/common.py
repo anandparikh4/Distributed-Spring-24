@@ -2,8 +2,6 @@ import asyncio
 import random
 import sys
 import time
-from datetime import (datetime as dt,
-                      timezone as tz)
 
 
 import aiohttp
