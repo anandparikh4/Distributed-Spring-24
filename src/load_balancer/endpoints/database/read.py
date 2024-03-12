@@ -57,8 +57,9 @@ async def read():
         if low > high:
             raise Exception('`low` cannot be greater than `high`')
         
-        # Get the shard names containing the entries
+        # Get the shard names and valid ats containing the entries
         shard_ids: list[str] = []
+        shard_valid_ats: list[int] = []
         pool = current_app.pool
         async with pool.acquire() as conn:
             stmt = conn.prepare(
@@ -69,11 +70,12 @@ async def read():
             async with conn.transaction():
                 async for record in stmt.cursor(low, high):
                     shard_ids.append(record["shard_id"])
+                    shard_valid_ats.append(record["valid_at"])
 
         data = []
 
         async with lock(Read):
-            for shard_id in shard_ids:
+            for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
                 if len(shard_map[shard_id]) > 0:
                     server_name = shard_map[shard_id][0] # TODO: Change to ConsistentHashMap
                     async with shard_locks[shard_id](Read):
@@ -101,7 +103,7 @@ async def read():
                                 json_payload={
                                     "shard": shard_id,
                                     "stud_id": stud_id,
-                                    "valid_at": valid_at
+                                    "valid_at": shard_valid_at
                                 }
                             ))]
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)

@@ -47,13 +47,13 @@ async def write():
             if (stud_id == -1 or stud_name == "" or stud_marks == -1):
                 raise Exception(f'Data entry "{entry}" is invalid')
         
-        # Get the shard names and the corresponding entries to be added
-        shard_data: dict[str, list] = dict()
+        # Get the shard names and valid ats and the corresponding entries to be added
+        shard_data: dict[str, tuple[list, int]] = dict()
         pool = current_app.pool
         async with pool.acquire() as conn:
             stmt = conn.prepare(
             '''
-            SELECT shard_id FROM ShardT WHERE 
+            SELECT shard_id, valid_at FROM ShardT WHERE 
             (stud_id_low <= ($1::int)) AND (($1::int) <= stud_id_low + shard_size)
             ''')
             for entry in data:
@@ -61,54 +61,72 @@ async def write():
                 async with conn.transaction():
                     async for record in stmt.cursor(stud_id):
                         shard_id = record["shard_id"]
+                        shard_valid_at = record["valid_at"]
+                        shard_data[shard_id][1] = shard_valid_at
                         if shard_id not in shard_data:
-                            shard_data[shard_id] = []
-                        shard_data[shard_id].append(entry)
+                            shard_data[shard_id][0] = []
+                        shard_data[shard_id][0].append(entry)
 
         async with lock(Read):
-            for shard_id in shard_data:
-                server_names = shard_map[shard_id] # TODO: Chage to ConsistentHashMap
-                async with shard_locks[shard_id](Write):
-                    async def wrapper(
-                        session: aiohttp.ClientSession,
-                        server_name: str,
-                        json_payload: dict
-                    ):
-                        # To allow other tasks to run
-                        await asyncio.sleep(0)
+            pool = current_app.pool
+            async with pool.acquire() as conn:
+                stmt = conn.prepate(
+                    '''
+                    UPDATE TABLE ShardT
+                    SET valid_at=($2::int) 
+                    WHERE shard_id=($1:int)
+                    '''
+                )
+                async with conn.transaction():
+                    for shard_id in shard_data:
+                        server_names = shard_map[shard_id] # TODO: Chage to ConsistentHashMap
+                        max_valid_at = shard_data[shard_id][1]
+                        async with shard_locks[shard_id](Write):
+                            async def wrapper(
+                                session: aiohttp.ClientSession,
+                                server_name: str,
+                                json_payload: dict
+                            ):
+                                # To allow other tasks to run
+                                await asyncio.sleep(0)
 
-                        async with session.post(f'http://{server_name}:5000/write', json=json_payload) as response:
-                            await response.read()
+                                async with session.post(f'http://{server_name}:5000/write', json=json_payload) as response:
+                                    await response.read()
 
-                        return response
-                    # END wrapper
+                                return response
+                            # END wrapper
 
-                     # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        tasks = [asyncio.create_task(
-                            wrapper(
-                                session, 
-                                server_name,
-                                json_payload={
-                                    "shard": shard_id,
-                                    "curr_idx": None, # TODO: Set this to the appropiate valid_idx
-                                    "data": shard_data[shard_id],
-                                    "valid_at": valid_at
-                                }
-                        )) for server_name in server_names]
-                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                        serv_response = serv_response[0] if not isinstance(
-                            serv_response[0], BaseException) else None
-                    # END async with
+                             # Convert to aiohttp request
+                            timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                            async with aiohttp.ClientSession(timeout=timeout) as session:
+                                tasks = [asyncio.create_task(
+                                    wrapper(
+                                        session, 
+                                        server_name,
+                                        json_payload={
+                                            "shard": shard_id,
+                                            "data": shard_data[shard_id][0],
+                                            "valid_at": shard_data[shard_id][1]
+                                        }
+                                )) for server_name in server_names]
+                                serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                                serv_response = serv_response[0] if not isinstance(
+                                    serv_response[0], BaseException) else None
+                            # END async with
 
-                    if serv_response is None:
-                        raise Exception('Server did not respond')
-                    
-                    serv_response = await serv_response.json()
-                    # TODO: Update valid_at from server_response
+                            if serv_response is None:
+                                raise Exception('Server did not respond')
+
+                            serv_response: dict = await serv_response.json()
+                            cur_valid_at = serv_response.get("valid_at", -1)
+                            if cur_valid_at == -1:
+                                raise Exception('Server response did not contain valid_at field')
+                            max_valid_at = max(max_valid_at, cur_valid_at)
+                        # END async with
+                        stmt.execute(shard_id, max_valid_at)
+                    # END for
                 # END async with
-            # END for
+            # END async with
         # END async with
                     
         # Return the response payload

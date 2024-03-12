@@ -54,63 +54,79 @@ async def update():
         if (stud_id == -1 or stud_name == "" or stud_marks == -1):
             raise Exception(f'Data is invalid')
         
-        # Get the shard name containing the entry
-        shard_id = None
+        # Get the shard name and valid at containing the entry
+        shard_id, shard_valid_at = None, None
         pool = current_app.pool
         async with pool.acquire() as conn:
             stmt = conn.prepare(
             '''
-            SELECT shard_id FROM ShardT WHERE 
+            SELECT shard_id, valid_at FROM ShardT WHERE 
             (stud_id_low <= ($1::int)) AND (($1::int) <= stud_id_low + shard_size)
             ''')
             async with conn.transaction():
                 async for record in stmt.cursor(stud_id):
                     shard_id = record["shard_id"]
+                    shard_valid_at = record["valid_at"]
         
         if not shard_id:
             raise Exception(f'stud_id {stud_id} does not exist')
 
         async with lock(Read):
-            server_names = shard_map[shard_id] # TODO: Change to ConsistentHashMap
-            async with shard_locks[shard_id](Read):
-                async def wrapper(
-                    session: aiohttp.ClientSession,
-                    server_name: str,
-                    json_payload: dict
-                ):
+            pool = current_app.pool
+            async with pool.acquire() as conn:
+                stmt = conn.prepate(
+                    '''
+                    UPDATE TABLE ShardT
+                    SET valid_at=($2::int) 
+                    WHERE shard_id=($1:int)
+                    '''
+                )
+                server_names = shard_map[shard_id] # TODO: Change to ConsistentHashMap
+                max_valid_at = shard_valid_at
+                async with shard_locks[shard_id](Read):
+                    async def wrapper(
+                        session: aiohttp.ClientSession,
+                        server_name: str,
+                        json_payload: dict
+                    ):
 
-                    # To allow other tasks to run
-                    await asyncio.sleep(0)
+                        # To allow other tasks to run
+                        await asyncio.sleep(0)
 
-                    async with session.put(f'http://{server_name}:5000/update', json=json_payload) as response:
-                        await response.read()
+                        async with session.put(f'http://{server_name}:5000/update', json=json_payload) as response:
+                            await response.read()
 
-                        return response
-                    # END wrapper
+                            return response
+                        # END wrapper
 
-                # Convert to aiohttp request
-                timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    tasks = [asyncio.create_task(wrapper(
-                        session, 
-                        server_name, 
-                        json_payload={
-                            "shard": shard_id,
-                            "stud_id": stud_id,
-                            "data": data,
-                            "valid_at": valid_at
-                        }
-                    )) for server_name in server_names]
-                    serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                    serv_response = serv_response[0] if not isinstance(
-                        serv_response[0], BaseException) else None
+                    # Convert to aiohttp request
+                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        tasks = [asyncio.create_task(wrapper(
+                            session, 
+                            server_name, 
+                            json_payload={
+                                "shard": shard_id,
+                                "stud_id": stud_id,
+                                "data": data,
+                                "valid_at": shard_valid_at
+                            }
+                        )) for server_name in server_names]
+                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                        serv_response = serv_response[0] if not isinstance(
+                            serv_response[0], BaseException) else None
+                    # END async with
+
+                    if serv_response is None:
+                        raise Exception('Server did not respond')
+
+                    serv_response: dict = await serv_response.json()
+                    cur_valid_at = serv_response.get("valid_at", -1)
+                    if cur_valid_at == -1:
+                        raise Exception('Server response did not contain valid_at field')
+                    max_valid_at = max(max_valid_at, cur_valid_at)
                 # END async with
-
-                if serv_response is None:
-                    raise Exception('Server did not respond')
-                
-                serv_response = await serv_response.json()
-                # TODO: Update valid_at from server_response
+                stmt.execute(shard_id, max_valid_at)
             # END async with
         # END async with
                     
