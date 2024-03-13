@@ -2,25 +2,24 @@ version: "3.9"
 name: distributed_systems_2
 
 services:
-
-  # Server-0:
-  #   build: ./server
-  #   image: server:v2
-  #   container_name: Server-0
-  #   networks:
-  #     my_net:
-  #       aliases:
-  #         - Server-0
-  #   hostname: Server-0
-  #   tty: true
-  #   environment:
-  #     SERVER_ID: 123456
-  #     DEBUG: "true"
-  #     POSTGRES_HOST: "localhost"
-  #     POSTGRES_PORT: 5432
-  #     POSTGRES_USER: "postgres"
-  #     POSTGRES_PASSWORD: "postgres"
-  #     POSTGRES_DB_NAME: "postgres"
+  Dummy-Server:
+    build: ./server
+    image: server:v2
+    container_name: Dummy-Server
+    networks:
+      my_net:
+        aliases:
+          - Dummy-Server
+    hostname: Dummy-Server
+    tty: true
+    environment:
+      SERVER_ID: 0
+      DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Load-Balancer:
     build: ./load_balancer

@@ -76,8 +76,8 @@ async def my_shutdown():
         # Allow other tasks to run
         await asyncio.sleep(0)
 
-        async with semaphore:
-            try:
+        try:
+            async with semaphore:
                 container = await docker.containers.get(server_name)
 
                 await container.stop(timeout=STOP_TIMEOUT)
@@ -88,14 +88,14 @@ async def my_shutdown():
                           f'Deleted container for {server_name}'
                           f'{Style.RESET_ALL}',
                           file=sys.stderr)
-            except Exception as e:
-                if DEBUG:
-                    print(f'{Fore.RED}ERROR | '
-                          f'{e}'
-                          f'{Style.RESET_ALL}',
-                          file=sys.stderr)
-            # END try-except
-        # END async with semaphore
+            # END async with semaphore
+        except Exception as e:
+            if DEBUG:
+                print(f'{Fore.RED}ERROR | '
+                      f'{e}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
+        # END try-except
     # END stop_and_delete_container
 
     async with Docker() as docker:

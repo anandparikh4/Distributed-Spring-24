@@ -13,5 +13,3 @@ venv.bak/
 .vscode/
 Dockerfile
 .dockerignore
-
-init/

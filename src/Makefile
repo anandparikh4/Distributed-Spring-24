@@ -1,6 +1,6 @@
 start:
-	docker build --tag server:v2 .
-	docker-compose up --build
+	docker-compose build
+	docker-compose up Load-Balancer
 
 stop:
 	docker-compose down --timeout 100

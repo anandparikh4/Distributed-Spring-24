@@ -17,6 +17,9 @@ RUN pip install --upgrade pip && \
 # Stage 2: Final stage
 FROM postgres:16.2-alpine3.19 as runner
 
+# Add postgres user to the root group
+RUN adduser postgres root
+
 # Set time zone
 RUN ln -s /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
 
