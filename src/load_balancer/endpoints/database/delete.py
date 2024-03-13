@@ -88,15 +88,18 @@ async def delete():
                         timeout = aiohttp.ClientTimeout(
                             connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(del_put_wrapper(
-                                session,
-                                server_name,
-                                json_payload={
-                                    "shard": shard_id,
-                                    "stud_id": stud_id,
-                                    "valid_at": shard_valid_at
-                                }
-                            )) for server_name in server_names]
+                            tasks = [asyncio.create_task(
+                                del_put_wrapper(
+                                    session,
+                                    server_name,
+                                    json_payload={
+                                        "shard": shard_id,
+                                        "stud_id": stud_id,
+                                        "valid_at": shard_valid_at
+                                    }
+                                )
+                            ) for server_name in server_names]
+
                             serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                             serv_response = [None if isinstance(r, BaseException)
                                              else r for r in serv_response]

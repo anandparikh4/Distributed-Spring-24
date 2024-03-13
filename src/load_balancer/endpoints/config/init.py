@@ -132,8 +132,16 @@ async def init():
                         shard_map[shard].append(hostname)
                     # END for shard in servers[hostname]
 
-                    tasks.append(spawn_container(docker, serv_id,
-                                                 hostname, semaphore))
+                    tasks.append(
+                        asyncio.create_task(
+                            spawn_container(
+                                docker,
+                                serv_id,
+                                hostname,
+                                semaphore
+                            )
+                        )
+                    )
                 # END for hostname in hostnames
 
                 # Wait for all tasks to complete

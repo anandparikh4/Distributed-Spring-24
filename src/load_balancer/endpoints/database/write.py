@@ -127,7 +127,9 @@ async def write():
                                             "data": shard_data[shard_id][0],
                                             "valid_at": shard_data[shard_id][1]
                                         }
-                                    )) for server_name in server_names]
+                                    )
+                                ) for server_name in server_names]
+
                                 serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                                 serv_response = [None if isinstance(r, BaseException)
                                                  else r for r in serv_response]

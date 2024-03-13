@@ -149,8 +149,16 @@ async def add():
                         shard_locks[shard] = FifoLock()
                     # END for shard in new_shards
 
-                    tasks.append(spawn_container(docker, serv_id,
-                                                 hostname, semaphore))
+                    tasks.append(
+                        asyncio.create_task(
+                            spawn_container(
+                                docker,
+                                serv_id,
+                                hostname,
+                                semaphore
+                            )
+                        )
+                    )
                 # END for hostname in hostnames
 
                 # Wait for all tasks to complete
@@ -162,10 +170,12 @@ async def add():
 
             # Define tasks
             tasks = [asyncio.create_task(
-                copy_shards_to_container(hostname,
-                                         servers[hostname],
-                                         semaphore)
-                     for hostname in hostnames)]
+                copy_shards_to_container(
+                    hostname,
+                    servers[hostname],
+                    semaphore
+                )
+            ) for hostname in hostnames]
 
             # Wait for all tasks to complete
             await asyncio.gather(*tasks, return_exceptions=True)

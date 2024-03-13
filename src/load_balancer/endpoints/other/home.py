@@ -53,7 +53,13 @@ async def home():
         # Convert to aiohttp request
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            task = asyncio.create_task(get_home_wrapper(session, server_name))
+            task = asyncio.create_task(
+                get_home_wrapper(
+                    session,
+                    server_name
+                )
+            )
+
             serv_response = await asyncio.gather(*[task], return_exceptions=True)
             serv_response = serv_response[0] if not isinstance(
                 serv_response[0], BaseException) else None

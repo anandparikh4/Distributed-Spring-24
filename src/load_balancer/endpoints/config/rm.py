@@ -164,13 +164,20 @@ async def rm():
 
                     # Remove the server id
                     serv_ids.pop(hostname, None)
-                    
+
                     # Remove server from shard_map
                     for shard in shard_map.values():
                         if hostname in shard:
                             shard.remove(hostname)
 
-                    tasks.append(remove_container(docker, hostname))
+                    tasks.append(
+                        asyncio.create_task(
+                            remove_container(
+                                docker,
+                                hostname
+                            )
+                        )
+                    )
                 # END for
 
                 # Wait for all tasks to complete

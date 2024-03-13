@@ -113,18 +113,21 @@ async def read():
 
                     async with shard_locks[shard_id](Read):
                         # Convert to aiohttp request
-                        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                        timeout = aiohttp.ClientTimeout(
+                            connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(read_get_wrapper(
-                                session,
-                                server_name,
-                                json_payload={
-                                    "shard": shard_id,
-                                    "stud_id": stud_id,
-                                    "valid_at": shard_valid_at
-                                }
-                            ))]
-                            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                            task = asyncio.create_task(
+                                read_get_wrapper(
+                                    session,
+                                    server_name,
+                                    json_payload={
+                                        "shard": shard_id,
+                                        "stud_id": stud_id,
+                                        "valid_at": shard_valid_at
+                                    }
+                                )
+                            )
+                            serv_response = await asyncio.gather(*[task], return_exceptions=True)
                             serv_response = serv_response[0] if not isinstance(
                                 serv_response[0], BaseException) else None
                         # END async with aiohttp.ClientSession(timeout=timeout) as session

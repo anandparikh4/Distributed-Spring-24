@@ -124,7 +124,12 @@ async def handle_flatline(
 
         # Define task to copy shards to the new container
         task = asyncio.create_task(
-            copy_shards_to_container(hostname, shards, semaphore))
+            copy_shards_to_container(
+                hostname,
+                shards,
+                semaphore,
+            )
+        )
 
         # Wait for task to complete
         await asyncio.gather(*[task], return_exceptions=True)
@@ -194,8 +199,13 @@ async def get_heartbeats():
             # Convert to aiohttp request
             timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                tasks = [asyncio.create_task(collect_heartbeat(session, server_name))
-                         for server_name in hostnames]
+                tasks = [asyncio.create_task(
+                    collect_heartbeat(
+                        session,
+                        server_name
+                    )
+                ) for server_name in hostnames]
+
                 heartbeats = await asyncio.gather(*tasks, return_exceptions=True)
                 heartbeats = [None if isinstance(heartbeat, BaseException)
                               else heartbeat for heartbeat in heartbeats]
@@ -239,7 +249,13 @@ async def get_heartbeats():
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
                             serv_id = serv_ids[hostnames[i]]
                             flatlines.append(
-                                handle_flatline_wrapper(serv_id, hostnames[i]))
+                                asyncio.create_task(
+                                    handle_flatline_wrapper(
+                                        serv_id,
+                                        hostnames[i]
+                                    )
+                                )
+                            )
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0

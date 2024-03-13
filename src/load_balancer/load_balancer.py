@@ -98,8 +98,13 @@ async def my_shutdown():
     # END stop_and_delete_container
 
     async with Docker() as docker:
-        tasks = [stop_and_delete_container(docker, server_name)
-                 for server_name in replicas.getServerList()]
+        tasks = [asyncio.create_task(
+            stop_and_delete_container(
+                docker,
+                server_name
+            )
+        ) for server_name in replicas.getServerList()]
+
         await asyncio.gather(*tasks, return_exceptions=True)
     # END async with Docker
 
