@@ -132,20 +132,20 @@ async def add():
 
                 # Add the hostnames to the list
                 for hostname in hostnames:
-                    # Add the hostname to the replicas list
-                    replicas.add(hostname)
-
-                    # Edit the flatline map
-                    heartbeat_fail_count[hostname] = 0
-
                     # get new server id
                     serv_id = get_new_server_id()
                     serv_ids[hostname] = serv_id
 
+                    # Add the hostname to the replicas list
+                    replicas.add(hostname, serv_id)
+
+                    # Edit the flatline map
+                    heartbeat_fail_count[hostname] = 0
+
                     # Add the shards to the shard_locks and shard_map
                     for shard in new_shard_ids:
                         # Change to ConsistentHashMap
-                        shard_map[shard] = []
+                        shard_map[shard] = ConsistentHashMap()
                         shard_locks[shard] = FifoLock()
                     # END for shard in new_shards
 
@@ -183,7 +183,7 @@ async def add():
             # Update the shard_map with the new replicas
             for hostname in hostnames:
                 for shard in servers[hostname]:
-                    shard_map[shard].append(hostname)
+                    shard_map[shard].add(hostname, serv_ids[hostname])
                 # END for shard in servers[hostname]
             # END for hostname in hostnames
 
@@ -381,13 +381,12 @@ async def copy_shards_to_container(
 
             async with conn.transaction():
                 for shard in shards:
-                    # Ignore empty shards
                     if len(shard_map[shard]) == 0:
                         continue
 
                     # Get server A from `shard_map` for the shard K
                     # TODO: Chage to ConsistentHashMap
-                    server = shard_map[shard][0]
+                    server = shard_map[shard].find(get_request_id())
 
                     shard_valid_at: int = await stmt.fetchval(shard)
 

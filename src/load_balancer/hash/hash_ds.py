@@ -1,20 +1,22 @@
 from typing import Callable
-import random
 import bisect
 
+from consts import HASH_NUM
+from .hash_functions import requestHashList, serverHashList
+
 # consistent hashing data structure
+
+
 class ConsistentHashMap:
 
     # constructor
     def __init__(
         self,
-        request_hash: Callable[[int], int],
-        server_hash: Callable[[int, int], int],
-        hostnames=None,
-        hostids=None,
+        request_hash: Callable[[int], int] = requestHashList[HASH_NUM],
+        server_hash: Callable[[int, int], int] = serverHashList[HASH_NUM],
         n_slots: int = 512,
         n_virtual: int = 9,
-        probing: str = 'linear'
+        probing: str = 'quadratic'
     ):
 
         # assign the hash functions
@@ -36,21 +38,14 @@ class ConsistentHashMap:
         # number of virtual copies to keep
         self.n_virtual = n_virtual
 
-        if len(hostnames) != len(hostids):
-            raise RuntimeError("Count of hostnames and hostids must be equal")
-
-        for i in range(0,len(hostnames)):
-            # populate slots
-            self.add(hostnames[i] , hostids[i])
-
     # length
     def __len__(self):
         return len(self.servers)
 
     # probing function
-    def probe(self, hashval: int, i: int) -> int:
+    def probe(self, hashval: int, i: int):
         if self.probing == 'quadratic':
-            return hashval + i*i
+            return hashval + i * i
 
         return hashval + i
 
@@ -72,7 +67,8 @@ class ConsistentHashMap:
         self.servers[hostname] = hostid
 
         for virtual_idx in range(self.n_virtual):
-            server_hash = (self.serverHash(hostid, virtual_idx + 1)) % self.n_slots
+            server_hash = (self.serverHash(
+                hostid, virtual_idx + 1)) % self.n_slots
             # Probe if there is collision
             i = 0
             slot = server_hash
@@ -104,12 +100,13 @@ class ConsistentHashMap:
         hostid = self.servers[hostname]
         self.servers.pop(hostname)
 
-        if(len(self.servers) == 0):
+        if (len(self.servers) == 0):
             self.next_server = [None] * self.n_slots
             self.server_slots = []
 
         for virtual_idx in range(self.n_virtual):
-            server_hash = (self.serverHash(hostid, virtual_idx + 1)) % self.n_slots
+            server_hash = (self.serverHash(
+                hostid, virtual_idx + 1)) % self.n_slots
             # Probing if there is collision
             i = 0
             slot = server_hash
@@ -138,11 +135,14 @@ class ConsistentHashMap:
             If no server present, cannot map request: raise error
             Else, return the cyclically next server's hostname
         '''
-        if len(self.servers) == 0:
-            raise RuntimeError("No servers alive")
         request_hash = (self.requestHash(request_id)) % self.n_slots
+
+        ret = self.next_server[request_hash]
+        if len(self.servers) == 0 or ret is None:
+            raise RuntimeError("No servers alive")
+
         # Here linear probing is necessary since nearest server is required
-        return self.next_server[request_hash]
+        return ret
 
     # get list of all hostnames of servers
     def getServerList(self):

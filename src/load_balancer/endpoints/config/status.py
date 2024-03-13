@@ -49,7 +49,7 @@ async def status():
             servers_to_shards: Dict[str, List[str]] = {}
 
             for shard, servers in shard_map.items():
-                for server in servers:
+                for server in servers.getServerList():
                     servers_to_shards[server] = servers_to_shards.get(server, [])
                     servers_to_shards[server].append(shard)
                 # END for server in servers

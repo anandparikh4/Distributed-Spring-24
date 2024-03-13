@@ -118,7 +118,7 @@ async def handle_flatline(
         # Copy shards to the new containers
         shards = [shard
                   for shard, servers in shard_map.items()
-                  if hostname in servers]
+                  if hostname in servers.getServerList()]
 
         semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
 
@@ -322,3 +322,12 @@ def get_new_server_id():
 
     return new_id
 # END get_new_server_id
+
+
+def get_request_id():
+    """
+    Get a new request id.
+    """
+
+    return random.randint(100000, 999999)
+# END get_request_id

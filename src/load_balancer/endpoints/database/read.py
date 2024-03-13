@@ -109,7 +109,7 @@ async def read():
             for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
                 if len(shard_map[shard_id]) > 0:
                     # TODO: Change to ConsistentHashMap
-                    server_name = shard_map[shard_id][0]
+                    server_name = shard_map[shard_id].find(get_request_id())
 
                     async with shard_locks[shard_id](Read):
                         # Convert to aiohttp request

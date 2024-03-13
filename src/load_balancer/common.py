@@ -30,9 +30,7 @@ if not DEBUG:
 
 
 # List to store web server replica hostnames
-replicas = ConsistentHashMap(
-    request_hash=requestHashList[HASH_NUM],
-    server_hash=serverHashList[HASH_NUM])
+replicas = ConsistentHashMap()
 
 
 # Map to store heartbeat fail counts for each server replica.
@@ -40,16 +38,14 @@ heartbeat_fail_count: Dict[str, int] = {}
 
 
 # server ids
-serv_ids: Dict[str, int] = {
-    # "Server-0": 123456,
-    # "Server-1": 234567,
-    # "Server-2": 345678,
-}  # Already 3 servers running
+serv_ids: Dict[str, int] = {}
 
 
 # Shard Name to ConsistentHashMap
 # To be filled by the load balancer with use
-shard_map: Dict[str, List[str]] = {}
+# TODO: change to Dict[str, ConsistentHashMap]
+shard_map: Dict[str, ConsistentHashMap] = {}
+
 
 # Shard Name to FifoLock
 # To be filled by the load balancer with use

@@ -110,26 +110,26 @@ async def init():
 
                 # Add the hostnames to the list
                 for hostname in hostnames:
-                    # Add the hostname to the replicas list
-                    replicas.add(hostname)
-
-                    # Edit the flatline map
-                    heartbeat_fail_count[hostname] = 0
-
                     # get new server id
                     serv_id = get_new_server_id()
                     serv_ids[hostname] = serv_id
 
+                    # Add the hostname to the replicas list
+                    replicas.add(hostname, serv_id)
+
+                    # Edit the flatline map
+                    heartbeat_fail_count[hostname] = 0
+
                     # Add the shards to the shard_locks and shard_map
                     for shard in new_shard_ids:
                         # Change to ConsistentHashMap
-                        shard_map[shard] = []
+                        shard_map[shard] = ConsistentHashMap()
                         shard_locks[shard] = FifoLock()
                     # END for shard in new_shards
 
                     # Update the shard_map with the new replicas
                     for shard in servers[hostname]:
-                        shard_map[shard].append(hostname)
+                        shard_map[shard].add(hostname, serv_id)
                     # END for shard in servers[hostname]
 
                     tasks.append(

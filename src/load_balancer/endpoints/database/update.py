@@ -95,7 +95,7 @@ async def update():
                     shard_valid_at: int = record["valid_at"]
 
                     # TODO: Change to ConsistentHashMap
-                    server_names = shard_map[shard_id]
+                    server_names = shard_map[shard_id].getServerList()
                     max_valid_at = shard_valid_at
 
                     async with shard_locks[shard_id](Write):

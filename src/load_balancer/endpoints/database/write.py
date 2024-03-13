@@ -111,7 +111,7 @@ async def write():
 
                     for shard_id in shard_data:
                         # TODO: Chage to ConsistentHashMap
-                        server_names = shard_map[shard_id]
+                        server_names = shard_map[shard_id].getServerList()
 
                         async with shard_locks[shard_id](Write):
                             # Convert to aiohttp request

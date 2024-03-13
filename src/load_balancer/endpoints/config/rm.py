@@ -76,7 +76,7 @@ async def rm():
             raise Exception(
                 'Length of hostname list is more than instances to delete')
 
-        singles = {servers[0]: shard
+        singles = {servers.getServerList()[0]: shard
                    for shard, servers in shard_map.items()
                    if len(servers) == 1}
 
@@ -166,9 +166,10 @@ async def rm():
                     serv_ids.pop(hostname, None)
 
                     # Remove server from shard_map
-                    for shard in shard_map.values():
-                        if hostname in shard:
-                            shard.remove(hostname)
+                    for servers in shard_map.values():
+                        _servers = servers.getServerList().copy()
+                        if hostname in _servers:
+                            servers.remove(hostname)
 
                     tasks.append(
                         asyncio.create_task(

@@ -26,7 +26,7 @@ async def home():
 
     try:
         # Generate a random request id
-        request_id = random.randint(100000, 999999)
+        request_id = get_request_id()
         ic(request_id)
 
         async with lock(Read):
