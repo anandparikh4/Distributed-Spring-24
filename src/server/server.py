@@ -1,5 +1,6 @@
 from quart import Quart
 
+import common
 from common import *
 from endpoints import blueprint as endpoints_blueprint
 
@@ -12,14 +13,12 @@ async def my_startup():
         Run startup tasks
     '''
 
-    global pool
-
     try:
         # Register blueprints
         app.register_blueprint(endpoints_blueprint)
 
         # Connect to the database
-        pool = asyncpg.create_pool(
+        common.pool = asyncpg.create_pool(
             user=DB_USER,
             password=DB_PASSWORD,
             database=DB_NAME,
@@ -27,7 +26,7 @@ async def my_startup():
             port=DB_PORT
         )
 
-        await pool
+        await common.pool
 
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
@@ -51,7 +50,7 @@ async def my_shutdown():
     '''
 
     # Close the database connection
-    await pool.close()
+    await common.pool.close()
 
 
 if __name__ == '__main__':

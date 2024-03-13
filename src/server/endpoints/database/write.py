@@ -1,5 +1,6 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 from .rules import rules
@@ -39,7 +40,7 @@ async def write():
         admin = str(payload.get('admin', 'false')).lower() == 'true'
 
         # Insert the data into the database
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
                 stmt = await connection.prepare('''--sql
                     INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at)

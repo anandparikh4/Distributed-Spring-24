@@ -1,8 +1,10 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 blueprint = Blueprint('config', __name__)
+
 
 @blueprint.route('/config', methods=["POST"])
 async def server_config():
@@ -11,7 +13,7 @@ async def server_config():
 
         Request payload:
             "shards" : ["sh0" , "sh1" , "sh2" ...]
-        
+
         Response payload:
             "status" : "success"
 
@@ -29,19 +31,19 @@ async def server_config():
 
         # Add to the database
         response_payload = {}
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
                 stmt = await connection.prepare('''--sql
                     INSERT INTO TermT (shard_id)
                     VALUES ($1::TEXT);
                 ''')
-                
+
                 await stmt.executemany(shard_list)
-        
+
         response_payload['status'] = 'success'
 
         return jsonify(ic(response_payload)), 200
-    
+
     except Exception as e:
         if DEBUG:
             print(f'{Fore.RED}ERROR | '

@@ -1,5 +1,6 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 from .rules import rules
@@ -34,7 +35,7 @@ async def data_write():
         data = dict(payload.get('data', {}))
 
         # Insert the data into the database
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
                 term: int = await connection.fetchval('''--sql
                     SELECT term 

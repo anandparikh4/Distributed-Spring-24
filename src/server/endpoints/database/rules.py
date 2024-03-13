@@ -1,3 +1,4 @@
+import common
 from common import *
 
 
@@ -14,7 +15,7 @@ async def rules(
 
     try:
         # Enforce rules by executing database operations
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
 
                 await connection.execute('''--sql

@@ -1,5 +1,6 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 from .rules import rules
@@ -34,7 +35,7 @@ async def delete():
         stud_id = int(payload.get('stud_id', -1))
 
         # Delete data from the database
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
                 # Get the term
                 term: int = await connection.fetchval('''--sql

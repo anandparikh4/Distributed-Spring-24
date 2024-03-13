@@ -1,5 +1,6 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 from .rules import rules
@@ -41,7 +42,7 @@ async def copy():
             response_payload[shard] = []
 
         # Get the data from the database
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
 
                 tasks = [asyncio.create_task(rules(shard, valid_at_shard))

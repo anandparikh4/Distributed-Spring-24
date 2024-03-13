@@ -1,5 +1,6 @@
 from quart import Blueprint, jsonify, request
 
+import common
 from common import *
 
 from .rules import rules
@@ -39,7 +40,7 @@ async def read():
 
         # Get the data from the database
         response_payload = {'data': [], 'status': 'success'}
-        async with pool.acquire() as connection:
+        async with common.pool.acquire() as connection:
             async with connection.transaction():
 
                 await rules(shard_id, valid_at)
