@@ -3,62 +3,24 @@ name: distributed_systems_2
 
 services:
 
-  Server-0:
-    build: ./server
-    image: server:v2
-    container_name: Server-0
-    networks:
-      my_net:
-        aliases:
-          - Server-0
-    hostname: Server-0
-    tty: true
-    environment:
-      SERVER_ID: 123456
-      DEBUG: "true"
-      POSTGRES_HOST: "localhost"
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
-      POSTGRES_DB_NAME: "postgres"
-
-  Server-1:
-    build: ./server
-    image: server:v2
-    container_name: Server-1
-    networks:
-      my_net:
-        aliases:
-          - Server-1
-    hostname: Server-1
-    tty: true
-    environment:
-      SERVER_ID: 234567
-      DEBUG: "true"
-      POSTGRES_HOST: "localhost"
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
-      POSTGRES_DB_NAME: "postgres"
-
-  Server-2:
-    build: ./server
-    image: server:v2
-    container_name: Server-2
-    networks:
-      my_net:
-        aliases:
-          - Server-2
-    hostname: Server-2
-    tty: true
-    environment:
-      SERVER_ID: 345678
-      DEBUG: "true"
-      POSTGRES_HOST: "localhost"
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
-      POSTGRES_DB_NAME: "postgres"
+  # Server-0:
+  #   build: ./server
+  #   image: server:v2
+  #   container_name: Server-0
+  #   networks:
+  #     my_net:
+  #       aliases:
+  #         - Server-0
+  #   hostname: Server-0
+  #   tty: true
+  #   environment:
+  #     SERVER_ID: 123456
+  #     DEBUG: "true"
+  #     POSTGRES_HOST: "localhost"
+  #     POSTGRES_PORT: 5432
+  #     POSTGRES_USER: "postgres"
+  #     POSTGRES_PASSWORD: "postgres"
+  #     POSTGRES_DB_NAME: "postgres"
 
   Load-Balancer:
     build: ./load_balancer
