@@ -17,25 +17,20 @@ async def rules(
         async with pool.acquire() as connection:
             async with connection.transaction():
 
-                await connection.execute(
-                    '''--sql
+                await connection.execute('''--sql
                     DELETE FROM StudT
                     WHERE (shard_id = $1::TEXT)
-                    AND (created_at > $2::INTEGER OR (deleted_at IS NOT NULL AND
-                                                      deleted_at <= $2::INTEGER));
-                    ''',
-                    shard_id,
-                    valid_at)
+                        AND (created_at > $2::INTEGER
+                            OR (deleted_at IS NOT NULL
+                                AND deleted_at <= $2::INTEGER));
+                    ''', shard_id, valid_at)
 
-                await connection.execute(
-                    '''--sql
+                await connection.execute('''--sql
                     UPDATE StudT
                     SET deleted_at = NULL
                     WHERE shard_id = $1::TEXT
-                    AND deleted_at > $2::INTEGER;
-                    ''',
-                    shard_id,
-                    valid_at)
+                        AND deleted_at > $2::INTEGER;
+                    ''', shard_id, valid_at)
 
     except Exception as e:
         if DEBUG:

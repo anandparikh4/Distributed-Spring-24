@@ -38,7 +38,8 @@ async def delete():
             async with connection.transaction():
                 # Get the term
                 term: int = await connection.fetchval('''--sql
-                    SELECT term FROM TermT
+                    SELECT term
+                    FROM TermT
                     WHERE shard_id = $1::TEXT;                         
                 ''', shard_id)
 
@@ -53,15 +54,15 @@ async def delete():
                     UPDATE StudT
                     SET deleted_at = $1::INTEGER
                     WHERE stud_id = $2::INTEGER 
-                    AND shard_id = $3::TEXT
-                    AND created_at <= $4::INTEGER;
+                        AND shard_id = $3::TEXT
+                        AND created_at <= $4::INTEGER;
                 ''', term, stud_id, shard_id, valid_at)
 
                 # Save the term in the TermT table
                 await connection.execute('''--sql
                     UPDATE TermT
                     SET term = $1::INTEGER
-                    WHERE shard_id = $2::TEXT;                         
+                    WHERE shard_id = $2::TEXT;
                 ''', term, shard_id)
 
         # Send the response

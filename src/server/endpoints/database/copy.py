@@ -33,8 +33,8 @@ async def copy():
         payload: dict = await request.get_json()
         ic(payload)
 
-        valid_at = list(payload.get('valid_at', -1))
-        shards = list(payload.get('shards', []))
+        shards: list[str] = list(payload.get('shards', []))
+        valid_at: list[int] = list(payload.get('valid_at', -1))
 
         response_payload = {}
         for shard in shards:
@@ -46,6 +46,7 @@ async def copy():
 
                 tasks = [asyncio.create_task(rules(shard, valid_at_shard))
                          for shard, valid_at_shard in zip(shards, valid_at)]
+
                 res = await asyncio.gather(*tasks, return_exceptions=True)
 
                 if any(res):
@@ -58,9 +59,10 @@ async def copy():
                     '''--sql
                     SELECT Stud_id, Stud_name, Stud_marks
                     FROM StudT
-                    WHERE shard_id = ANY($1::TEXT[])
-                    AND created_at <= $2::INTEGER; 
+                    WHERE shard_id = $1::TEXT
+                        AND created_at <= $2::INTEGER;
                     ''')
+
                 for shard, valid_at_shard in zip(shards, valid_at):
                     async for record in stmt.cursor(shard, valid_at_shard):
                         record = dict(record)

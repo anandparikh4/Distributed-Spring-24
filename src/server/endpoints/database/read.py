@@ -48,10 +48,9 @@ async def read():
                     SELECT Stud_id, Stud_name, Stud_marks
                     FROM StudT
                     WHERE shard_id = $1
-                    AND Stud_id BETWEEN $2 AND $3
-                    AND created_at <= $4;
-                ''',
-                                                      shard_id, id_low, id_high, valid_at):
+                        AND stud_id BETWEEN $2 AND $3
+                        AND created_at <= $4;
+                ''', shard_id, id_low, id_high, valid_at):
 
                     response_payload['data'].append(dict(record))
 

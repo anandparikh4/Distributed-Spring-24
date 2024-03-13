@@ -37,7 +37,8 @@ async def data_write():
         async with pool.acquire() as connection:
             async with connection.transaction():
                 term: int = await connection.fetchval('''--sql
-                    SELECT term FROM TermT
+                    SELECT term 
+                    FROM TermT
                     WHERE shard_id = $1::TEXT;                         
                 ''', shard_id)
 
@@ -49,8 +50,8 @@ async def data_write():
                     UPDATE StudT
                     SET deleted_at = $1::INTEGER
                     WHERE stud_id = $2::INTEGER
-                    AND created_at <= $3::INTEGER
-                    AND shard_id = $4::TEXT;                  
+                        AND created_at <= $3::INTEGER
+                        AND shard_id = $4::TEXT;
                 ''', term, data['stud_id'], valid_at, shard_id)
 
                 term += 1
@@ -61,7 +62,7 @@ async def data_write():
                             $2::TEXT, 
                             $3::INTEGER, 
                             $4::TEXT, 
-                            $5::INTEGER);               
+                            $5::INTEGER);
                 ''', data['stud_id'], data['stud_name'], data['stud_marks'], shard_id, term)
 
                 await connection.execute('''--sql
