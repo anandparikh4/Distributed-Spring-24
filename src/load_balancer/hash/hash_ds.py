@@ -36,13 +36,6 @@ class ConsistentHashMap:
         # number of virtual copies to keep
         self.n_virtual = n_virtual
 
-        # # initialize with hostnames and hostids
-        # if hostnames is None and hostids is None:
-        #     # default hostnames
-        #     hostnames = ["Server-1", "Server-2", "Server-3"]
-        #     # random 6-digit hostids
-        #     hostids = random.sample(range(0,999999), 3)
-
         if len(hostnames) != len(hostids):
             raise RuntimeError("Count of hostnames and hostids must be equal")
 

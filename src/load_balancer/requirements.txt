@@ -1,6 +1,7 @@
 aiodocker
-aiohttp
+aiohttp[speedups]
 asyncpg
+asyncpg-stubs
 colorama
 fifolock
 icecream
