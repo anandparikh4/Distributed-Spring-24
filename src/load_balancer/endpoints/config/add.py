@@ -119,7 +119,7 @@ async def add():
 
             if len(problems) > 0:
                 raise Exception(
-                    f'Shards `{problems}` are not defined in shard_map union new_shards')
+                    f'Shards `{problems}` are not defined in shard_map or new_shards')
 
             ic("To add: ", hostnames, new_shards)
 
@@ -187,27 +187,29 @@ async def add():
                 # END for shard in servers[hostname]
             # END for hostname in hostnames
 
-            async with pool.acquire() as conn:
-                stmt = await conn.prepare(
-                    '''--sql
-                    INSERT INTO shardT (
-                        stud_id_low,
-                        shard_id,
-                        shard_size)
-                    VALUES (
-                        $1::INTEGER,
-                        $2::TEXT,
-                        $3::INTEGER)
-                    ''')
+            if len(new_shards) > 0:
+                async with pool.acquire() as conn:
+                    stmt = await conn.prepare(
+                        '''--sql
+                        INSERT INTO shardT (
+                            stud_id_low,
+                            shard_id,
+                            shard_size)
+                        VALUES (
+                            $1::INTEGER,
+                            $2::TEXT,
+                            $3::INTEGER)
+                        ''')
 
-                async with conn.transaction():
-                    await stmt.executemany(
-                        [(shard['stud_id_low'],
-                          shard['shard_id'],
-                          shard['shard_size'])
-                         for shard in new_shards])
-                # END async with conn.transaction()
-            # END async with pool.acquire() as conn
+                    async with conn.transaction():
+                        await stmt.executemany(
+                            [(shard['stud_id_low'],
+                            shard['shard_id'],
+                            shard['shard_size'])
+                            for shard in new_shards])
+                    # END async with conn.transaction()
+                # END async with pool.acquire() as conn
+            # END if len(new_shards) > 0
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)

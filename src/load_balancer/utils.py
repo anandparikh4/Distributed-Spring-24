@@ -162,6 +162,41 @@ async def get_heartbeats():
 
     await asyncio.sleep(0)
 
+    async def collect_heartbeat(
+        session: aiohttp.ClientSession,
+        server_name: str,
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            async with session.get(f'http://{server_name}:5000/heartbeat') as response:
+                await response.read()
+
+            return response
+        # END async with semaphore
+    # END collect_heartbeats
+
+    async def handle_flatline_wrapper(
+        serv_id: int,
+        server_name: str
+    ):
+        # To allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            try:
+                await handle_flatline(serv_id, server_name)
+            except Exception as e:
+                if DEBUG:
+                    print(f'{Fore.RED}ERROR | '
+                          f'{e}'
+                          f'{Style.RESET_ALL}',
+                          file=sys.stderr)
+            # END try-except
+        # END async with semaphore
+    # END handle_flatline_wrapper
+
     try:
         while True:
             # check heartbeat every `HEARTBEAT_INTERVAL` seconds
@@ -180,22 +215,6 @@ async def get_heartbeats():
 
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
 
-            async def collect_heartbeat(
-                session: aiohttp.ClientSession,
-                server_name: str,
-            ):
-
-                # Allow other tasks to run
-                await asyncio.sleep(0)
-
-                async with semaphore:
-                    async with session.get(f'http://{server_name}:5000/heartbeat') as response:
-                        await response.read()
-
-                    return response
-                # END async with semaphore
-            # END collect_heartbeats
-
             # Convert to aiohttp request
             timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -208,33 +227,14 @@ async def get_heartbeats():
 
                 heartbeats = await asyncio.gather(*tasks, return_exceptions=True)
                 heartbeats = [None if isinstance(heartbeat, BaseException)
-                              else heartbeat for heartbeat in heartbeats]
+                              else heartbeat
+                              for heartbeat in heartbeats]
             # END async with session
 
             # To allow other tasks to run
             await asyncio.sleep(0)
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-            async def handle_flatline_wrapper(
-                serv_id: int,
-                server_name: str
-            ):
-                # To allow other tasks to run
-                await asyncio.sleep(0)
-
-                async with semaphore:
-                    try:
-                        await handle_flatline(serv_id, server_name)
-                    except Exception as e:
-                        if DEBUG:
-                            print(f'{Fore.RED}ERROR | '
-                                  f'{e}'
-                                  f'{Style.RESET_ALL}',
-                                  file=sys.stderr)
-                    # END try-except
-                # END async with semaphore
-            # END handle_flatline_wrapper
 
             flatlines = []
 
@@ -281,31 +281,6 @@ async def get_heartbeats():
 # END get_heartbeats
 
 
-async def create_db_pool():
-    pool = await asyncpg.create_pool(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
-
-    if pool is None:
-        print(f'{Fore.RED}ERROR | '
-              f'Failed to create database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
-        sys.exit(1)
-    else:
-        print(f'{Fore.LIGHTGREEN_EX}DB | '
-              f'Created database pool for {DB_NAME} at {DB_HOST}:{DB_PORT}'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
-
-    return pool
-# END create_db_pool
-
-
 def get_new_server_id():
     """
     Get a new server id.
@@ -314,10 +289,10 @@ def get_new_server_id():
     global serv_ids
 
     # generate new 6-digit id not in `serv_ids`
-    new_id = random.randint(1, 999999)
+    new_id = get_request_id()
 
     while new_id in serv_ids.values():
-        new_id = random.randint(1, 999999)
+        new_id = get_request_id()
     # END while
 
     return new_id

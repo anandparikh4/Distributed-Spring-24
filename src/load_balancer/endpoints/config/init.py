@@ -97,7 +97,7 @@ async def init():
                 problems |= set(shards) - new_shard_ids
 
             if len(problems) > 0:
-                raise Exception(f'Shards {problems} are not defined in shards')
+                raise Exception(f'Shards `{problems}` are not defined in new_shards')
 
             ic("To add: ", hostnames, new_shards)
 
