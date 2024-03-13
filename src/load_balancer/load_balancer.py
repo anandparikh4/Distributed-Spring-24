@@ -41,7 +41,7 @@ async def my_startup():
               file=sys.stderr)
 
         print(f'{Fore.RED}ERROR | '
-              f'Failed to start the server. Exiting...'
+              f'Failed to start the load balancer. Exiting...'
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 

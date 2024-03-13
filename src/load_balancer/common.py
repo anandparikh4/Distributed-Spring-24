@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import random
 import sys
-import time
 from typing import Any, Dict, List, Set, Tuple
 
 import aiohttp

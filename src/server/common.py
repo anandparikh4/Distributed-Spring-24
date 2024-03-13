@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import sys
 
@@ -13,7 +15,10 @@ ic.configureOutput(prefix=f'[{HOSTNAME}: {SERVER_ID}] | ')
 if not DEBUG:
     ic.disable()
 
+
+# Postgres connection pool
 pool: asyncpg.Pool[asyncpg.Record]
+
 
 def err_payload(err: Exception):
     """

@@ -5,28 +5,43 @@ from endpoints import blueprint as endpoints_blueprint
 
 app = Quart(__name__)
 
+
 @app.before_serving
 async def my_startup():
     '''
         Run startup tasks
     '''
-    
+
     global pool
 
-    # Register blueprints
-    app.register_blueprint(endpoints_blueprint)
+    try:
+        # Register blueprints
+        app.register_blueprint(endpoints_blueprint)
 
-    # Connect to the database
-    pool = asyncpg.create_pool(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+        # Connect to the database
+        pool = asyncpg.create_pool(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
 
-    await pool
+        await pool
 
+    except Exception as e:
+        print(f'{Fore.RED}ERROR | '
+              f'{e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to start the server. Exiting...'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        # Exit the program
+        sys.exit(1)
 
 
 @app.after_serving
@@ -37,7 +52,6 @@ async def my_shutdown():
 
     # Close the database connection
     await pool.close()
-
 
 
 if __name__ == '__main__':
