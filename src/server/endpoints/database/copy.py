@@ -16,7 +16,7 @@ async def copy():
 
         Request payload:
             "shards": ["sh1", "sh2"...]
-            "valid_at": <valid_at>
+            "valid_at": [<valid_at_sh1>, <valid_at_sh2>...]
 
         Response payload:
             "sh1": [data]
@@ -35,7 +35,7 @@ async def copy():
         payload: dict = await request.get_json()
         ic(payload)
 
-        valid_at = int(payload.get('valid_at', -1))
+        valid_at = list(payload.get('valid_at', -1))
         shards = list(payload.get('shards', []))
 
         response_payload = {}
@@ -46,8 +46,8 @@ async def copy():
         async with pool.acquire() as connection:
             async with connection.transaction():
 
-                tasks = [asyncio.create_task(rules(shard, valid_at))
-                         for shard in shards]
+                tasks = [asyncio.create_task(rules(shard, valid_at_shard))
+                         for shard, valid_at_shard in zip(shards, valid_at)]
                 res = await asyncio.gather(*tasks, return_exceptions=True)
 
                 if any(res):
@@ -56,18 +56,17 @@ async def copy():
                 # for shard in shards:
                 #     await rules(shard, valid_at)
 
-                async for record in connection.cursor(
-                        '''--sql
-                        SELECT Stud_id, Stud_name, Stud_marks
-                        FROM StudT
-                        WHERE shard_id = ANY($1::TEXT[])
-                        AND created_at <= $2::INTEGER; 
-                        ''',
-                        shards, valid_at):
-
-                    shard_id = record['shard_id']
-                    record = dict(record)
-                    response_payload[shard_id].append(record)
+                stmt = await connection.prepare(
+                    '''--sql
+                    SELECT Stud_id, Stud_name, Stud_marks
+                    FROM StudT
+                    WHERE shard_id = ANY($1::TEXT[])
+                    AND created_at <= $2::INTEGER; 
+                    ''')
+                for shard, valid_at_shard in zip(shards, valid_at):
+                    async for record in stmt.cursor(shard, valid_at_shard):
+                        record = dict(record)
+                        response_payload[shard].append(record)
 
         response_payload['status'] = 'success'
 
