@@ -1,9 +1,9 @@
 from quart import Blueprint, jsonify
 
 from common import *
-from consts import *
 
 blueprint = Blueprint('home', __name__)
+
 
 @blueprint.route('/home', methods=['GET'])
 async def home():

@@ -1,8 +1,5 @@
-from quart import Blueprint, current_app, jsonify, request
-from colorama import Fore, Style
-import sys
+from quart import Blueprint, jsonify, request
 
-from consts import *
 from common import *
 
 blueprint = Blueprint('config', __name__)

@@ -1,12 +1,11 @@
 from quart import Blueprint, jsonify, request
-from colorama import Fore, Style
-import sys
 
-from rules import rules
-from consts import *
 from common import *
 
+from .rules import rules
+
 blueprint = Blueprint('update', __name__)
+
 
 @blueprint.route('/update', methods=['POST'])
 async def data_write():
@@ -23,7 +22,7 @@ async def data_write():
             "message": Data entry for stud_id:<stud_id> updated
             "valid_at": <valid_at>
             "status": "success"
-            
+
     """
 
     try:
@@ -33,7 +32,7 @@ async def data_write():
         valid_at = int(payload.get('valid_at', -1))
         shard_id = str(payload.get('shard', -1))
         data = dict(payload.get('data', {}))
-        
+
         # Insert the data into the database
         async with pool.acquire() as connection:
             async with connection.transaction():
@@ -70,7 +69,6 @@ async def data_write():
                     SET term = $1::INTEGER
                     WHERE shard_id = $2::TEXT;                    
                 ''', term, shard_id)
-    
 
         # Send the response
         response_payload = {
@@ -80,14 +78,10 @@ async def data_write():
         }
 
         return jsonify(ic(response_payload)), 200
-    
+
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
-                f'Error in data_write: {e}'
-                f'{Style.RESET_ALL}',
-                file=sys.stderr)
+              f'Error in data_write: {e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
-
-                    
-
-

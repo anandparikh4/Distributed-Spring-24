@@ -1,6 +1,9 @@
-from icecream import ic
-import asyncpg
 import asyncio
+import sys
+
+import asyncpg
+from colorama import Fore, Style
+from icecream import ic
 
 from consts import *
 

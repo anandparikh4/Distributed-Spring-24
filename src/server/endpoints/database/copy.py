@@ -1,10 +1,8 @@
 from quart import Blueprint, jsonify, request
-from colorama import Fore, Style
-import sys
 
-from rules import rules
-from consts import *
 from common import *
+
+from .rules import rules
 
 blueprint = Blueprint('copy', __name__)
 

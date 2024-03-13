@@ -1,12 +1,11 @@
 from quart import Blueprint, jsonify, request
-from colorama import Fore, Style
-import sys
 
-from rules import rules
-from consts import *
 from common import *
 
+from .rules import rules
+
 blueprint = Blueprint('delete', __name__)
+
 
 @blueprint.route('/del', methods=['DELETE'])
 async def delete():
@@ -22,7 +21,7 @@ async def delete():
             "message"  : Data entry with stud_id:<stud_id> removed
             "status"   : "success"
             "valid_at" : <valid_at>
-            
+
     """
 
     try:
@@ -73,14 +72,10 @@ async def delete():
         }
 
         return jsonify(ic(response_payload)), 200
-    
+
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
-                f'Error in data_write: {e}'
-                f'{Style.RESET_ALL}',
-                file=sys.stderr)
+              f'Error in data_write: {e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400
-
-                    
-
-

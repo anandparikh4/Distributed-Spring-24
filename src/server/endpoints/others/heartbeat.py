@@ -2,6 +2,7 @@ from quart import Blueprint, Response
 
 blueprint = Blueprint('heartbeat', __name__)
 
+
 @blueprint.route('/heartbeat', methods=['GET'])
 async def heartbeat():
     """

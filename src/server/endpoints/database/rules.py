@@ -1,13 +1,8 @@
-from colorama import Fore, Style
-import sys
-
-from consts import *
 from common import *
+
 
 # All rules for enforcing synchronization between shard replicas across servers
 # Simply do 'await rules(shard_id, term)' in each operation. No return value
-
-
 async def rules(
     shard_id: str,
     valid_at: int

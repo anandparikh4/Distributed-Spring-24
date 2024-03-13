@@ -1,11 +1,6 @@
-import sys
-
 from quart import Quart
-from colorama import Fore, Style
 
-from consts import *
 from common import *
-
 from endpoints import blueprint as endpoints_blueprint
 
 app = Quart(__name__)
