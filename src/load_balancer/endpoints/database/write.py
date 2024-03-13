@@ -78,8 +78,8 @@ async def write():
                     FROM
                         ShardT
                     WHERE
-                        (stud_id_low <= ($2::INTEGER)) AND
-                        (($1::INTEGER) <= stud_id_low + shard_size)
+                        (stud_id_low <= ($1::INTEGER)) AND
+                        (($1::INTEGER) < stud_id_low + shard_size)
                     ''')
 
                 update_shard_info_stmt = await conn.prepare(
@@ -87,9 +87,9 @@ async def write():
                     UPDATE
                         ShardT
                     SET
-                        valid_at = ($2::INTEGER)
+                        valid_at = ($1::INTEGER)
                     WHERE
-                        shard_id = ($1::INTEGER)
+                        shard_id = ($2::TEXT)
                     ''')
 
                 async with conn.transaction():
@@ -147,7 +147,7 @@ async def write():
                                 max_valid_at = max(max_valid_at, cur_valid_at)
                             # END for r in serv_response
 
-                            await update_shard_info_stmt.executemany([(shard_id, max_valid_at)])
+                            await update_shard_info_stmt.executemany([(max_valid_at, shard_id)])
                         # END async with shard_locks[shard_id](Write)
                     # END for shard_id in shard_data
                 # END async with conn.transaction()

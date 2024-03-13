@@ -83,7 +83,7 @@ async def read():
         async with lock(Read):
             async with pool.acquire() as conn:
                 async with conn.transaction():
-                    record = await conn.fetchrow(
+                    async for record in conn.cursor(
                         '''--sql
                         SELECT
                             shard_id,
@@ -91,16 +91,16 @@ async def read():
                         FROM
                             ShardT
                         WHERE
-                            (stud_id_low <= ($1::INTEGER)) AND
-                            (($1::INTEGER) <= stud_id_low + shard_size)
-                        ''',
-                        stud_id)
+                            (stud_id_low <= ($2::INTEGER)) AND
+                            (($1::INTEGER) < stud_id_low + shard_size)
+                        ''', low, high):
 
-                    if record is None:
-                        raise Exception(f'stud_id {stud_id} does not exist')
-
-                    shard_id: str = record["shard_id"]
-                    shard_valid_at: int = record["valid_at"]
+                        shard_ids.append(record["shard_id"])
+                        shard_valid_ats.append(record["valid_at"])
+                    # END async for record in conn.cursor
+                    
+                    if len(shard_ids) == 0:
+                        raise Exception('No data entries found')
                 # END async with conn.transaction()
             # END async with pool.acquire()
 

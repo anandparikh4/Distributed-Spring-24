@@ -70,7 +70,7 @@ async def delete():
                             ShardT
                         WHERE
                             (stud_id_low <= ($1::INTEGER)) AND
-                            (($1::INTEGER) <= stud_id_low + shard_size)
+                            (($1::INTEGER) < stud_id_low + shard_size)
                         ''',
                         stud_id)
 
@@ -123,7 +123,7 @@ async def delete():
                             SET
                                 valid_at = ($1::INTEGER)
                             WHERE
-                                shard_id = ($2::INTEGER)
+                                shard_id = ($2::TEXT)
                             ''',
                             max_valid_at,
                             shard_id,

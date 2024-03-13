@@ -1,5 +1,4 @@
 -- PostgreSQL 16.2
--- This file is used to create the initial database schema
 START TRANSACTION;
 
 -- Create the Shard Metadata Table
