@@ -150,19 +150,19 @@ async def init():
             # END async with Docker
 
             async with common.pool.acquire() as conn:
-                stmt = await conn.prepare(
-                    '''--sql
-                    INSERT INTO shardT (
-                        stud_id_low,
-                        shard_id,
-                        shard_size)
-                    VALUES (
-                        $1::INTEGER,
-                        $2::TEXT,
-                        $3::INTEGER)
-                    ''')
-
                 async with conn.transaction(isolation='serializable'):
+                    stmt = await conn.prepare(
+                        '''--sql
+                        INSERT INTO shardT (
+                            stud_id_low,
+                            shard_id,
+                            shard_size)
+                        VALUES (
+                            $1::INTEGER,
+                            $2::TEXT,
+                            $3::INTEGER)
+                        ''')
+
                     await stmt.executemany(
                         [(shard['stud_id_low'],
                           shard['shard_id'],

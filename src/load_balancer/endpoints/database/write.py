@@ -70,29 +70,29 @@ async def write():
 
         async with lock(Read):
             async with common.pool.acquire() as conn:
-                get_shard_info_stmt = await conn.prepare(
-                    '''--sql
-                    SELECT
-                        shard_id,
-                        valid_at
-                    FROM
-                        ShardT
-                    WHERE
-                        (stud_id_low <= ($1::INTEGER)) AND
-                        (($1::INTEGER) < stud_id_low + shard_size)
-                    ''')
-
-                update_shard_info_stmt = await conn.prepare(
-                    '''--sql
-                    UPDATE
-                        ShardT
-                    SET
-                        valid_at = ($1::INTEGER)
-                    WHERE
-                        shard_id = ($2::TEXT)
-                    ''')
-
                 async with conn.transaction(isolation='serializable'):
+                    get_shard_info_stmt = await conn.prepare(
+                        '''--sql
+                        SELECT
+                            shard_id,
+                            valid_at
+                        FROM
+                            ShardT
+                        WHERE
+                            (stud_id_low <= ($1::INTEGER)) AND
+                            (($1::INTEGER) < stud_id_low + shard_size)
+                        ''')
+
+                    update_shard_info_stmt = await conn.prepare(
+                        '''--sql
+                        UPDATE
+                            ShardT
+                        SET
+                            valid_at = ($1::INTEGER)
+                        WHERE
+                            shard_id = ($2::TEXT)
+                        ''')
+
                     for entry in data:
                         stud_id = int(entry["stud_id"])
                         record = await get_shard_info_stmt.fetchrow(stud_id)
