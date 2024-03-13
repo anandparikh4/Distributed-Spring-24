@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import random
 import sys
 import time
-
+from typing import Any, Dict, List, Set, Tuple
 
 import aiohttp
 import asyncpg
@@ -10,7 +12,6 @@ from aiodocker import Docker
 from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
-from typing import List, Dict, Any, Tuple, Set
 
 from consts import *
 from hash import ConsistentHashMap, requestHashList, serverHashList

@@ -5,7 +5,7 @@ from .write import blueprint as write_blueprint
 from .update import blueprint as update_blueprint
 from .delete import blueprint as delete_blueprint
 
-blueprint = Blueprint('config', __name__)
+blueprint = Blueprint('database', __name__)
 
 # Register the blueprints
 blueprint.register_blueprint(read_blueprint)

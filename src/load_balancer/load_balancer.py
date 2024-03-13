@@ -2,6 +2,7 @@ from quart import Quart
 
 from endpoints import blueprint as all_blueprints
 from utils import *
+from heartbeat_flatline import get_heartbeats
 
 app = Quart(__name__)
 
