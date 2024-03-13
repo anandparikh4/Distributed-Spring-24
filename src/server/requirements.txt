@@ -1,3 +1,4 @@
 asyncpg
 icecream
 Quart
+colorama

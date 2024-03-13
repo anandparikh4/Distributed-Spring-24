@@ -1,49 +1,49 @@
-import os
 import sys
 
-from icecream import ic
-from quart import Quart, Response, jsonify
+from quart import Quart
+from colorama import Fore, Style
+
+from consts import *
+from common import *
+
+from endpoints import blueprint as endpoints_blueprint
 
 app = Quart(__name__)
 
-SERVER_ID = os.environ.get('SERVER_ID', '0')
-HOSTNAME = os.environ.get('HOSTNAME', 'localhost')
-DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+@app.before_serving
+async def my_startup():
+    '''
+        Run startup tasks
+    '''
+    
+    global pool
 
-ic.configureOutput(prefix=f'[{HOSTNAME}: {SERVER_ID}] | ')
+    # Register blueprints
+    app.register_blueprint(endpoints_blueprint)
 
-# Disable icecream debug messages if DEBUG is not set to true
-if not DEBUG:
-    ic.disable()
+    # Connect to the database
+    pool = asyncpg.create_pool(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
 
-
-@app.route('/home', methods=['GET'])
-async def home():
-    """
-    Greet a client with its server ID.
-
-    Response payload:
-        message: Hello from Server: [ID]
-        status: status of the response
-    """
-
-    return jsonify(ic({
-        'message': f"Hello from Server: {SERVER_ID}",
-        'status': "successful"
-    })), 200
+    await pool
 
 
-@app.route('/heartbeat', methods=['GET'])
-async def heartbeat():
-    """
-    Send heartbeat response upon request.
 
-    Response payload:
-        message: [EMPTY]
-        status: status of the response
-    """
+@app.after_serving
+async def my_shutdown():
+    '''
+        Run shutdown tasks
+    '''
 
-    return Response(status=200)
+    # Close the database connection
+    await pool.close()
+
+
 
 if __name__ == '__main__':
     # Take port number from argument if provided
