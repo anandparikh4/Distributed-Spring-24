@@ -1,4 +1,4 @@
-from quart import Quart, g
+from quart import Quart
 
 from endpoints import blueprint as all_blueprints
 from utils import *
