@@ -14,7 +14,7 @@ from fifolock import FifoLock
 from icecream import ic
 
 from consts import *
-from hash import ConsistentHashMap, requestHashList, serverHashList
+from hash import ConsistentHashMap
 
 # Lock to protect the replicas list
 lock = FifoLock()

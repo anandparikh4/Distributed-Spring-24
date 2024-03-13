@@ -1,6 +1,7 @@
 from quart import Blueprint, jsonify, request
 
 from utils import *
+
 from .add import spawn_container
 
 blueprint = Blueprint('init', __name__)
@@ -48,7 +49,6 @@ async def init():
     global heartbeat_fail_count
     global serv_ids
     global shard_map
-    global pool
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -149,7 +149,7 @@ async def init():
                 await asyncio.gather(*tasks, return_exceptions=True)
             # END async with Docker
 
-            async with pool.acquire() as conn:
+            async with common.pool.acquire() as conn:
                 stmt = await conn.prepare(
                     '''--sql
                     INSERT INTO shardT (
@@ -169,7 +169,7 @@ async def init():
                           shard['shard_size'])
                          for shard in new_shards])
                 # END async with conn.transaction()
-            # END async with pool.acquire() as conn
+            # END async with common.pool.acquire() as conn
 
             final_hostnames = ic(replicas.getServerList())
         # END async with lock(Write)

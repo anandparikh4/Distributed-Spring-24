@@ -136,7 +136,7 @@ async def copy_shards_to_container(
         call_server_shards: Dict[str, List[Tuple[str, int]]] = {}
 
         # For each shard K in `shards`:
-        async with pool.acquire() as conn:
+        async with common.pool.acquire() as conn:
             stmt = await conn.prepare(
                 '''--sql
                 SELECT
@@ -167,7 +167,7 @@ async def copy_shards_to_container(
                     call_server_shards[server].append((shard, shard_valid_at))
                 # END for shard in shards
             # END async with conn.transaction()
-        # END async with pool.acquire() as conn
+        # END async with common.pool.acquire() as conn
 
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:

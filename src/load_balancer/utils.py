@@ -1,4 +1,5 @@
 from common import *
+import common
 
 class Read(asyncio.Future):
     @staticmethod

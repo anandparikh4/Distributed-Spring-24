@@ -20,7 +20,6 @@ async def status():
     global replicas
     global shard_map
     global serv_ids
-    global pool
 
     await asyncio.sleep(0)
 
@@ -28,7 +27,7 @@ async def status():
         async with lock(Read):
             shards: List[Dict[str, Any]] = []
 
-            async with pool.acquire() as conn:
+            async with common.pool.acquire() as conn:
                 async with conn.transaction(
                         isolation='serializable',
                         readonly=True,
@@ -38,7 +37,7 @@ async def status():
                             SELECT
                                 stud_id_low,
                                 shard_id,
-                                shard_size,
+                                shard_size
                             FROM
                                 shardT;
                         ''')
@@ -47,7 +46,7 @@ async def status():
                         shards.append(dict(record))
                     # END async for record in stmt.cursor()
                 # END async with conn.transaction()
-            # END async with pool.acquire()
+            # END async with common.pool.acquire()
 
             servers_to_shards: Dict[str, List[str]] = {}
 

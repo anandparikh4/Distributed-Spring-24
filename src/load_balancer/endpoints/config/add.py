@@ -57,7 +57,6 @@ async def add():
     global heartbeat_fail_count
     global serv_ids
     global shard_map
-    global pool
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -189,7 +188,7 @@ async def add():
             # END for hostname in hostnames
 
             if len(new_shards) > 0:
-                async with pool.acquire() as conn:
+                async with common.pool.acquire() as conn:
                     stmt = await conn.prepare(
                         '''--sql
                         INSERT INTO shardT (
@@ -209,7 +208,7 @@ async def add():
                               shard['shard_size'])
                              for shard in new_shards])
                     # END async with conn.transaction()
-                # END async with pool.acquire() as conn
+                # END async with common.pool.acquire() as conn
             # END if len(new_shards) > 0
 
             final_hostnames = ic(replicas.getServerList())

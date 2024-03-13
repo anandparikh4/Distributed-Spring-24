@@ -81,7 +81,7 @@ async def read():
         shard_valid_ats: list[int] = []
 
         async with lock(Read):
-            async with pool.acquire() as conn:
+            async with common.pool.acquire() as conn:
                 async with conn.transaction(
                         isolation='serializable',
                         readonly=True,
@@ -101,11 +101,11 @@ async def read():
                         shard_ids.append(record["shard_id"])
                         shard_valid_ats.append(record["valid_at"])
                     # END async for record in conn.cursor
-                    
+
                     if len(shard_ids) == 0:
                         raise Exception('No data entries found')
                 # END async with conn.transaction()
-            # END async with pool.acquire()
+            # END async with common.pool.acquire()
 
             data = []
 

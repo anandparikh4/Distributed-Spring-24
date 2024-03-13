@@ -1,8 +1,8 @@
 from quart import Quart
 
 from endpoints import blueprint as all_blueprints
-from utils import *
 from heartbeat_flatline import get_heartbeats
+from utils import *
 
 app = Quart(__name__)
 
@@ -14,18 +14,15 @@ async def my_startup():
 
     Start heartbeat background task.
     """
-
-    global pool
-
+    
     try:
         # Register the blueprints
         app.register_blueprint(all_blueprints)
 
         # Register the heartbeat background task
         app.add_background_task(get_heartbeats)
-
-        # Connect to the database
-        pool = asyncpg.create_pool(
+        
+        common.pool = asyncpg.create_pool(
             user=DB_USER,
             password=DB_PASSWORD,
             database=DB_NAME,
@@ -33,7 +30,14 @@ async def my_startup():
             port=DB_PORT,
         )
 
-        await pool
+        await common.pool
+
+        if DEBUG:
+            print(f'{Fore.LIGHTYELLOW_EX}CONNECT | '
+                  f'Connected to the database'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
+
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
               f'{e}'
@@ -61,7 +65,6 @@ async def my_shutdown():
     """
 
     global replicas
-    global pool
 
     # Stop the heartbeat background task
     app.background_tasks.pop().cancel()
@@ -110,7 +113,7 @@ async def my_shutdown():
     # END async with Docker
 
     # close the pool
-    await pool.close()
+    await common.pool.close()
 # END my_shutdown
 
 

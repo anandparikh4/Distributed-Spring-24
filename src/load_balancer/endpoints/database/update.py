@@ -72,7 +72,7 @@ async def update():
             raise Exception('Data entry is invalid')
 
         async with lock(Read):
-            async with pool.acquire() as conn:
+            async with common.pool.acquire() as conn:
                 async with conn.transaction(isolation='serializable'):
                     record = await conn.fetchrow(
                         '''--sql
@@ -146,7 +146,7 @@ async def update():
                         )
                     # END async with shard_locks[shard_id](Write)
                 # END async with conn.transaction()
-            # END async with pool.acquire() as conn
+            # END async with common.pool.acquire() as conn
         # END async with lock(Read)
 
         # Return the response payload

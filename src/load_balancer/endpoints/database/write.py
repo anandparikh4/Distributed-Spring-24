@@ -69,7 +69,7 @@ async def write():
         shard_data: Dict[str, Tuple[List[Dict[str, Any]], int]] = {}
 
         async with lock(Read):
-            async with pool.acquire() as conn:
+            async with common.pool.acquire() as conn:
                 get_shard_info_stmt = await conn.prepare(
                     '''--sql
                     SELECT
@@ -151,7 +151,7 @@ async def write():
                         # END async with shard_locks[shard_id](Write)
                     # END for shard_id in shard_data
                 # END async with conn.transaction()
-            # END async with pool.acquire() as conn
+            # END async with common.pool.acquire() as conn
         # END async with lock(Read)
 
         # Return the response payload
