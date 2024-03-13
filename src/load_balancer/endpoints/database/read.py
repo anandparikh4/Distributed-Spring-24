@@ -82,7 +82,10 @@ async def read():
 
         async with lock(Read):
             async with pool.acquire() as conn:
-                async with conn.transaction():
+                async with conn.transaction(
+                        isolation='serializable',
+                        readonly=True,
+                        deferrable=True):
                     async for record in conn.cursor(
                         '''--sql
                         SELECT

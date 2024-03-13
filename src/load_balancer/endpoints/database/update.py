@@ -73,7 +73,7 @@ async def update():
 
         async with lock(Read):
             async with pool.acquire() as conn:
-                async with conn.transaction():
+                async with conn.transaction(isolation='serializable'):
                     record = await conn.fetchrow(
                         '''--sql
                         SELECT

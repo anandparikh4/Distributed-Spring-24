@@ -21,15 +21,18 @@ async def status():
     global shard_map
     global serv_ids
     global pool
-    
+
     await asyncio.sleep(0)
 
-    try :
+    try:
         async with lock(Read):
             shards: List[Dict[str, Any]] = []
 
             async with pool.acquire() as conn:
-                async with conn.transaction():
+                async with conn.transaction(
+                        isolation='serializable',
+                        readonly=True,
+                        deferrable=True):
                     stmt = await conn.prepare(
                         '''--sql
                             SELECT
@@ -37,7 +40,7 @@ async def status():
                                 shard_id,
                                 shard_size,
                             FROM
-                                shardT
+                                shardT;
                         ''')
 
                     async for record in stmt.cursor():
@@ -50,7 +53,8 @@ async def status():
 
             for shard, servers in shard_map.items():
                 for server in servers.getServerList():
-                    servers_to_shards[server] = servers_to_shards.get(server, [])
+                    if server not in servers_to_shards:
+                        servers_to_shards[server] = []
                     servers_to_shards[server].append(shard)
                 # END for server in servers
             # END for shard, servers in shard_map.items()

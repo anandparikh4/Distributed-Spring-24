@@ -92,7 +92,7 @@ async def write():
                         shard_id = ($2::TEXT)
                     ''')
 
-                async with conn.transaction():
+                async with conn.transaction(isolation='serializable'):
                     for entry in data:
                         stud_id = int(entry["stud_id"])
                         record = await get_shard_info_stmt.fetchrow(stud_id)

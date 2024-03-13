@@ -202,7 +202,7 @@ async def add():
                             $3::INTEGER)
                         ''')
 
-                    async with conn.transaction():
+                    async with conn.transaction(isolation='serializable'):
                         await stmt.executemany(
                             [(shard['stud_id_low'],
                               shard['shard_id'],

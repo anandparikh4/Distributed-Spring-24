@@ -147,7 +147,10 @@ async def copy_shards_to_container(
                     shard_id = $1::TEXT
                 ''')
 
-            async with conn.transaction():
+            async with conn.transaction(
+                    isolation='serializable',
+                    readonly=True,
+                    deferrable=True):
                 for shard in shards:
                     if len(shard_map[shard]) == 0:
                         continue

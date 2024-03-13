@@ -97,7 +97,8 @@ async def init():
                 problems |= set(shards) - new_shard_ids
 
             if len(problems) > 0:
-                raise Exception(f'Shards `{problems}` are not defined in new_shards')
+                raise Exception(
+                    f'Shards `{problems}` are not defined in new_shards')
 
             ic("To add: ", hostnames, new_shards)
 
@@ -161,7 +162,7 @@ async def init():
                         $3::INTEGER)
                     ''')
 
-                async with conn.transaction():
+                async with conn.transaction(isolation='serializable'):
                     await stmt.executemany(
                         [(shard['stud_id_low'],
                           shard['shard_id'],
