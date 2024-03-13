@@ -14,14 +14,14 @@ async def my_startup():
 
     Start heartbeat background task.
     """
-    
+
     try:
         # Register the blueprints
         app.register_blueprint(all_blueprints)
 
         # Register the heartbeat background task
         app.add_background_task(get_heartbeats)
-        
+
         common.pool = asyncpg.create_pool(
             user=DB_USER,
             password=DB_PASSWORD,
