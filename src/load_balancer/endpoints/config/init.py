@@ -53,6 +53,24 @@ async def init():
     # Allow other tasks to run
     await asyncio.sleep(0)
 
+    async def post_config_wrapper(
+        semaphore: asyncio.Semaphore,
+        session: aiohttp.ClientSession,
+        hostname: str,
+        payload: Dict,
+    ):
+        # Allow other tasks to run
+        await asyncio.sleep(0)
+
+        async with semaphore:
+            async with session.post(f'http://{hostname}:5000/config',
+                                    json=payload) as response:
+                await response.read()
+
+            return response
+        # END async with semaphore
+    # END post_config_wrapper
+
     try:
         # Get the request payload
         payload = dict(await request.get_json())
@@ -103,7 +121,7 @@ async def init():
             ic("To add: ", hostnames, new_shards)
 
             # Spawn new containers
-            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
+            docker_semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
             async with Docker() as docker:
                 # Define tasks
@@ -136,18 +154,49 @@ async def init():
                     tasks.append(
                         asyncio.create_task(
                             spawn_container(
-                                docker,
-                                serv_id,
-                                hostname,
-                                semaphore
+                                docker=docker,
+                                serv_id=serv_id,
+                                hostname=hostname,
+                                semaphore=docker_semaphore
                             )
                         )
                     )
                 # END for hostname in hostnames
 
                 # Wait for all tasks to complete
-                await asyncio.gather(*tasks, return_exceptions=True)
+                res = await asyncio.gather(*tasks, return_exceptions=True)
+
+                if any(res):
+                    raise Exception('Failed to spawn containers')
             # END async with Docker
+
+            await asyncio.sleep(0)
+
+            # config the new shards
+            req_semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+            timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # Define tasks
+                tasks = [asyncio.create_task(
+                    post_config_wrapper(
+                        semaphore=req_semaphore,
+                        session=session,
+                        hostname=hostname,
+                        payload={
+                            "shards": servers[hostname]
+                        }
+                    )
+                ) for hostname in hostnames]
+
+                # Wait for all tasks to complete
+                config_responses = await asyncio.gather(*tasks, return_exceptions=True)
+                config_responses = [None if isinstance(response, BaseException)
+                                    else response
+                                    for response in config_responses]
+
+                for (hostname, response) in zip(hostnames, config_responses):
+                    if response is None or response.status != 200:
+                        raise Exception(f'Failed to add shards to {hostname}')
 
             async with common.pool.acquire() as conn:
                 async with conn.transaction(isolation='serializable'):
@@ -184,11 +233,6 @@ async def init():
         })), 200
 
     except Exception as e:
-        if DEBUG:
-            print(f'{Fore.RED}ERROR | '
-                  f'{e}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
 
         return jsonify(ic(err_payload(e))), 400
     # END try-except

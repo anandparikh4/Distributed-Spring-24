@@ -3,6 +3,8 @@ from utils import *
 
 
 async def handle_flatline(
+    docker_semaphore: asyncio.Semaphore,
+    docker: Docker,
     serv_id: int,
     hostname: str
 ):
@@ -19,68 +21,59 @@ async def handle_flatline(
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 
-    try:
-        async with Docker() as docker:
-            container_config = get_container_config(serv_id, hostname)
+    async with docker_semaphore:
+        container_config = get_container_config(serv_id, hostname)
 
-            # create the container
-            container = await docker.containers.create_or_replace(
-                name=hostname,
-                config=container_config,
-            )
-
-            # Attach the container to the network and set the alias
-            my_net = await docker.networks.get('my_net')
-
-            await my_net.connect({
-                'Container': container.id,
-                'EndpointConfig': {
-                    'Aliases': [hostname]
-                }
-            })
-
-            if DEBUG:
-                print(f'{Fore.LIGHTGREEN_EX}RECREATE | '
-                      f'Created container for {hostname}'
-                      f'{Style.RESET_ALL}',
-                      file=sys.stderr)
-
-            # start the container
-            await container.start()
-
-            if DEBUG:
-                print(f'{Fore.MAGENTA}RESPAWN | '
-                      f'Started container for {hostname}'
-                      f'{Style.RESET_ALL}',
-                      file=sys.stderr)
-        # END async with docker
-
-        # Copy shards to the new containers
-        shards = [shard
-                  for shard, servers in shard_map.items()
-                  if hostname in servers.getServerList()]
-
-        semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
-
-        # Define task to copy shards to the new container
-        task = asyncio.create_task(
-            copy_shards_to_container(
-                hostname,
-                shards,
-                semaphore,
-            )
+        # create the container
+        container = await docker.containers.create_or_replace(
+            name=hostname,
+            config=container_config,
         )
 
-        # Wait for task to complete
-        await asyncio.gather(*[task], return_exceptions=True)
+        # Attach the container to the network and set the alias
+        my_net = await docker.networks.get('my_net')
 
-    except Exception as e:
+        await my_net.connect({
+            'Container': container.id,
+            'EndpointConfig': {
+                'Aliases': [hostname]
+            }
+        })
+
         if DEBUG:
-            print(f'{Fore.RED}ERROR | '
-                  f'{e}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
-    # END try-except
+            print(f'{Fore.LIGHTGREEN_EX}RECREATE | '
+                    f'Created container for {hostname}'
+                    f'{Style.RESET_ALL}',
+                    file=sys.stderr)
+
+        # start the container
+        await container.start()
+
+        if DEBUG:
+            print(f'{Fore.MAGENTA}RESPAWN | '
+                    f'Started container for {hostname}'
+                    f'{Style.RESET_ALL}',
+                    file=sys.stderr)
+    # END async with docker_semaphore
+
+    # Copy shards to the new containers
+    shards = [shard
+                for shard, servers in shard_map.items()
+                if hostname in servers.getServerList()]
+
+    req_semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+    # Define task to copy shards to the new container
+    task = asyncio.create_task(
+        copy_shards_to_container(
+            hostname,
+            shards,
+            req_semaphore,
+        )
+    )
+
+    # Wait for task to complete
+    await asyncio.gather(*[task], return_exceptions=True)
 # END handle_flatline
 
 
@@ -103,6 +96,7 @@ async def get_heartbeats():
     await asyncio.sleep(0)
 
     async def collect_heartbeat(
+        semaphore: asyncio.Semaphore,
         session: aiohttp.ClientSession,
         server_name: str,
     ):
@@ -118,19 +112,26 @@ async def get_heartbeats():
     # END collect_heartbeats
 
     async def handle_flatline_wrapper(
+        semaphore: asyncio.Semaphore,
+        docker: Docker,
         serv_id: int,
-        server_name: str
+        hostname: str
     ):
         # To allow other tasks to run
         await asyncio.sleep(0)
 
         async with semaphore:
             try:
-                await handle_flatline(serv_id, server_name)
+                await handle_flatline(
+                    docker_semaphore=semaphore,
+                    docker=docker,
+                    serv_id=serv_id,
+                    hostname=hostname
+                )
             except Exception as e:
                 if DEBUG:
                     print(f'{Fore.RED}ERROR | '
-                          f'{e}'
+                          f'{e.__class__.__name__}: {e}'
                           f'{Style.RESET_ALL}',
                           file=sys.stderr)
             # END try-except
@@ -154,12 +155,12 @@ async def get_heartbeats():
             # END async with common.lock(Read)
 
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
-
             # Convert to aiohttp request
             timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 tasks = [asyncio.create_task(
                     collect_heartbeat(
+                        semaphore,
                         session,
                         server_name
                     )
@@ -174,9 +175,7 @@ async def get_heartbeats():
             # To allow other tasks to run
             await asyncio.sleep(0)
 
-            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-            flatlines = []
+            flatlines: List[Tuple[str, int]] = []
 
             async with common.lock(Write):
                 for i, response in enumerate(heartbeats):
@@ -188,14 +187,7 @@ async def get_heartbeats():
                         # If fail count exceeds the max count, respawn the server replica
                         if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
                             serv_id = serv_ids[hostnames[i]]
-                            flatlines.append(
-                                asyncio.create_task(
-                                    handle_flatline_wrapper(
-                                        serv_id,
-                                        hostnames[i]
-                                    )
-                                )
-                            )
+                            flatlines.append((hostnames[i], serv_id))
                     else:
                         # Reset the fail count for the server replica
                         heartbeat_fail_count[hostnames[i]] = 0
@@ -206,7 +198,20 @@ async def get_heartbeats():
 
                 # Reswapn the flatlined server replicas
                 if len(flatlines) > 0:
-                    await asyncio.gather(*flatlines, return_exceptions=True)
+                    docker_semaphore = asyncio.Semaphore(
+                        DOCKER_TASK_BATCH_SIZE)
+
+                    async with Docker() as docker:
+                        tasks = [asyncio.create_task(
+                            handle_flatline_wrapper(
+                                semaphore=docker_semaphore,
+                                docker=docker,
+                                serv_id=serv_id,
+                                hostname=serv_name
+                            )
+                        ) for serv_name, serv_id in flatlines]
+
+                        await asyncio.gather(*tasks, return_exceptions=True)
             # END async with common.lock(Write)
 
         # END while

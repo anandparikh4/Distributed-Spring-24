@@ -144,7 +144,7 @@ async def rm():
                     except Exception as e:
                         if DEBUG:
                             print(f'{Fore.RED}ERROR | '
-                                  f'{e}'
+                                  f'{e.__class__.__name__}: {e}'
                                   f'{Style.RESET_ALL}',
                                   file=sys.stderr)
                     # END try-except
@@ -201,11 +201,6 @@ async def rm():
         # END async with lock
 
     except Exception as e:
-        if DEBUG:
-            print(f'{Fore.RED}ERROR | '
-                  f'{e}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
 
         return jsonify(ic(err_payload(e))), 400
     # END try-except

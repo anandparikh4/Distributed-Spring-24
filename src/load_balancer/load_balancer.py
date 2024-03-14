@@ -40,7 +40,7 @@ async def my_startup():
 
     except Exception as e:
         print(f'{Fore.RED}ERROR | '
-              f'{e}'
+              f'{e.__class__.__name__}: {e}'
               f'{Style.RESET_ALL}',
               file=sys.stderr)
 
@@ -96,7 +96,7 @@ async def my_shutdown():
         except Exception as e:
             if DEBUG:
                 print(f'{Fore.RED}ERROR | '
-                      f'{e}'
+                      f'{e.__class__.__name__}: {e}'
                       f'{Style.RESET_ALL}',
                       file=sys.stderr)
         # END try-except

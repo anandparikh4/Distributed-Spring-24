@@ -70,11 +70,6 @@ async def status():
 
         # END async with lock
     except Exception as e:
-        if DEBUG:
-            print(f'{Fore.RED}ERROR | '
-                  f'{e}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
 
         return jsonify(ic(err_payload(e))), 400
     # END try-except
