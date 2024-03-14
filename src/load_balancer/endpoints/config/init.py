@@ -133,6 +133,13 @@ async def init():
 
             ic("To add: ", hostnames, new_shards)
 
+            # Add the shards to the shard_locks and shard_map
+            for shard in new_shard_ids:
+                # Change to ConsistentHashMap
+                shard_map[shard] = ConsistentHashMap()
+                shard_locks[shard] = FifoLock()
+            # END for shard in new_shards
+
             # Spawn new containers
             docker_semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
@@ -151,13 +158,6 @@ async def init():
 
                     # Edit the flatline map
                     heartbeat_fail_count[hostname] = 0
-
-                    # Add the shards to the shard_locks and shard_map
-                    for shard in new_shard_ids:
-                        # Change to ConsistentHashMap
-                        shard_map[shard] = ConsistentHashMap()
-                        shard_locks[shard] = FifoLock()
-                    # END for shard in new_shards
 
                     # Update the shard_map with the new replicas
                     for shard in servers[hostname]:

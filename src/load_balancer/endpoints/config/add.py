@@ -122,6 +122,13 @@ async def add():
                     f'Shards `{problems}` are not defined in shard_map or new_shards')
 
             ic("To add: ", hostnames, new_shards)
+            
+            # Add the shards to the shard_locks and shard_map
+            for shard in new_shard_ids:
+                # Change to ConsistentHashMap
+                shard_map[shard] = ConsistentHashMap()
+                shard_locks[shard] = FifoLock()
+            # END for shard in new_shards
 
             # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
@@ -141,13 +148,6 @@ async def add():
 
                     # Edit the flatline map
                     heartbeat_fail_count[hostname] = 0
-
-                    # Add the shards to the shard_locks and shard_map
-                    for shard in new_shard_ids:
-                        # Change to ConsistentHashMap
-                        shard_map[shard] = ConsistentHashMap()
-                        shard_locks[shard] = FifoLock()
-                    # END for shard in new_shards
 
                     tasks.append(
                         asyncio.create_task(
