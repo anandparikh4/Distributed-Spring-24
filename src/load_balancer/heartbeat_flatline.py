@@ -42,24 +42,24 @@ async def handle_flatline(
 
         if DEBUG:
             print(f'{Fore.LIGHTGREEN_EX}RECREATE | '
-                    f'Created container for {hostname}'
-                    f'{Style.RESET_ALL}',
-                    file=sys.stderr)
+                  f'Created container for {hostname}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
 
         # start the container
         await container.start()
 
         if DEBUG:
             print(f'{Fore.MAGENTA}RESPAWN | '
-                    f'Started container for {hostname}'
-                    f'{Style.RESET_ALL}',
-                    file=sys.stderr)
+                  f'Started container for {hostname}'
+                  f'{Style.RESET_ALL}',
+                  file=sys.stderr)
     # END async with docker_semaphore
 
     # Copy shards to the new containers
     shards = [shard
-                for shard, servers in shard_map.items()
-                if hostname in servers.getServerList()]
+              for shard, servers in shard_map.items()
+              if hostname in servers.getServerList()]
 
     req_semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
 
@@ -185,7 +185,7 @@ async def get_heartbeats():
                             heartbeat_fail_count.get(hostnames[i], 0) + 1
 
                         # If fail count exceeds the max count, respawn the server replica
-                        if heartbeat_fail_count[hostnames[i]] >= MAX_FAIL_COUNT:
+                        if heartbeat_fail_count[hostnames[i]] >= MAX_HEARTBEAT_FAIL_COUNT:
                             serv_id = serv_ids[hostnames[i]]
                             flatlines.append((hostnames[i], serv_id))
                     else:

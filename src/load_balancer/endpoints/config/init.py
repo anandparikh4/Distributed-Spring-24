@@ -63,6 +63,19 @@ async def init():
         await asyncio.sleep(0)
 
         async with semaphore:
+            # Wait for the server to be up
+            for _ in range(MAX_CONFIG_FAIL_COUNT):
+                try:
+                    async with session.get(f'http://{hostname}:5000/heartbeat') as response:
+                        if response.status == 200:
+                            break
+                except Exception:
+                    pass
+                await asyncio.sleep(HEARTBEAT_CONFIG_INTERVAL)
+            else:
+                raise Exception()
+            # END for _ in range(MAX_CONFIG_FAIL_COUNT)
+
             async with session.post(f'http://{hostname}:5000/config',
                                     json=payload) as response:
                 await response.read()
