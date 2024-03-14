@@ -40,11 +40,18 @@ ENV PATH "/opt/venv/bin:$PATH"
 ENV PYTHONPATH "/opt/venv/lib/python3.11/site-packages:$PYTHONPATH"
 ENV PYTHONUNBUFFERED 1
 
-# Expose the port
-EXPOSE 5000
+# Entry point
+COPY my-entrypoint.sh /usr/local/bin/
+ENTRYPOINT ["my-entrypoint.sh"]
 
-# Set the entrypoint
+# Set the working directory
+WORKDIR /app
+
+# Set the init scripts
 COPY init/ /docker-entrypoint-initdb.d/
 
 # Copy the application
 COPY . .
+
+# Deploy the application
+CMD ["./deploy.sh"]

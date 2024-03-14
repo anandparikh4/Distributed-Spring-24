@@ -69,6 +69,9 @@ async def my_shutdown():
     # Stop the heartbeat background task
     app.background_tasks.pop().cancel()
 
+    # close the pool
+    await common.pool.close()
+
     # Stop all server replicas
     semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
@@ -111,9 +114,6 @@ async def my_shutdown():
 
         await asyncio.gather(*tasks, return_exceptions=True)
     # END async with Docker
-
-    # close the pool
-    await common.pool.close()
 # END my_shutdown
 
 
