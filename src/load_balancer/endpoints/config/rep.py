@@ -19,7 +19,7 @@ async def rep():
 
     global replicas
 
-    async with lock(Read):
+    async with common.lock(Read):
 
         # Return the response payload
         return jsonify(ic({

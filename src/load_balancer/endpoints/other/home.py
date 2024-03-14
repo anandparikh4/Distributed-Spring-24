@@ -29,7 +29,7 @@ async def home():
         request_id = get_request_id()
         ic(request_id)
 
-        async with lock(Read):
+        async with common.lock(Read):
             server_name = replicas.find(request_id)
 
         if server_name is None:

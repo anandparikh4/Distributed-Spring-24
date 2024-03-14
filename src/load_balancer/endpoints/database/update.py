@@ -71,7 +71,7 @@ async def update():
                    ["stud_id", "stud_name", "stud_marks"]):
             raise Exception('Data entry is invalid')
 
-        async with lock(Read):
+        async with common.lock(Read):
             async with common.pool.acquire() as conn:
                 async with conn.transaction(isolation='serializable'):
                     record = await conn.fetchrow(
@@ -147,7 +147,7 @@ async def update():
                     # END async with shard_locks[shard_id](Write)
                 # END async with conn.transaction()
             # END async with common.pool.acquire() as conn
-        # END async with lock(Read)
+        # END async with common.lock(Read)
 
         # Return the response payload
         return jsonify(ic({

@@ -80,7 +80,7 @@ async def read():
         shard_ids: list[str] = []
         shard_valid_ats: list[int] = []
 
-        async with lock(Read):
+        async with common.lock(Read):
             async with common.pool.acquire() as conn:
                 async with conn.transaction(
                         isolation='serializable',
@@ -143,7 +143,7 @@ async def read():
                     # END async with shard_locks[shard_id](Read)
                 # END if len(shard_map[shard_id]) > 0
             # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
-        # END async with lock(Read)
+        # END async with common.lock(Read)
 
         # Return the response payload
         return jsonify(ic({

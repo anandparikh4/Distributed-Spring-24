@@ -68,7 +68,7 @@ async def write():
         # [shard_at] -> (list of entries, valid_at)
         shard_data: Dict[str, Tuple[List[Dict[str, Any]], int]] = {}
 
-        async with lock(Read):
+        async with common.lock(Read):
             async with common.pool.acquire() as conn:
                 async with conn.transaction(isolation='serializable'):
                     get_shard_info_stmt = await conn.prepare(
@@ -152,7 +152,7 @@ async def write():
                     # END for shard_id in shard_data
                 # END async with conn.transaction()
             # END async with common.pool.acquire() as conn
-        # END async with lock(Read)
+        # END async with common.lock(Read)
 
         # Return the response payload
         return jsonify(ic({

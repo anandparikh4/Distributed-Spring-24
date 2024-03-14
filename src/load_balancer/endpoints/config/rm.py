@@ -90,7 +90,7 @@ async def rm():
                 f'present in the hostnames `{single_problems.keys()}` '
                 f'to delete, respectively.')
 
-        async with lock(Write):
+        async with common.lock(Write):
             choices = set(replicas.getServerList())
 
             # Convert hostnames to set for faster lookup
@@ -186,7 +186,7 @@ async def rm():
             # END async with Docker
 
             final_hostnames = ic(replicas.getServerList())
-        # END async with lock(Write)
+        # END async with common.lock(Write)
 
         # Return the response payload
         return jsonify(ic({

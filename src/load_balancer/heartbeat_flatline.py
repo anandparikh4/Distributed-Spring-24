@@ -142,7 +142,7 @@ async def get_heartbeats():
             # check heartbeat every `HEARTBEAT_INTERVAL` seconds
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
-            async with lock(Read):
+            async with common.lock(Read):
                 if DEBUG:
                     print(f'{Fore.CYAN}HEARTBEAT | '
                           f'Checking heartbeat every {HEARTBEAT_INTERVAL} seconds'
@@ -151,7 +151,7 @@ async def get_heartbeats():
 
                 # Get the list of server replica hostnames
                 hostnames = replicas.getServerList().copy()
-            # END async with lock(Read)
+            # END async with common.lock(Read)
 
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
 
@@ -178,7 +178,7 @@ async def get_heartbeats():
 
             flatlines = []
 
-            async with lock(Write):
+            async with common.lock(Write):
                 for i, response in enumerate(heartbeats):
                     if response is None or not response.status == 200:
                         # Increment the fail count for the server replica
@@ -207,7 +207,7 @@ async def get_heartbeats():
                 # Reswapn the flatlined server replicas
                 if len(flatlines) > 0:
                     await asyncio.gather(*flatlines, return_exceptions=True)
-            # END async with lock(Write)
+            # END async with common.lock(Write)
 
         # END while
 

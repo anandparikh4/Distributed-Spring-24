@@ -24,7 +24,7 @@ async def status():
     await asyncio.sleep(0)
 
     try:
-        async with lock(Read):
+        async with common.lock(Read):
             shards: List[Dict[str, Any]] = []
 
             async with common.pool.acquire() as conn:

@@ -82,7 +82,7 @@ async def init():
                 raise Exception('Invalid shard description')
         # END for shard in new_shards
 
-        async with lock(Write):
+        async with common.lock(Write):
             # Check is slots are available
             if n > replicas.remaining():
                 raise Exception(
@@ -172,7 +172,7 @@ async def init():
             # END async with common.pool.acquire() as conn
 
             final_hostnames = ic(replicas.getServerList())
-        # END async with lock(Write)
+        # END async with common.lock(Write)
 
         # Return the response payload
         return jsonify(ic({
