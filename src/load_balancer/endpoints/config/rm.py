@@ -62,7 +62,7 @@ async def rm():
         n = int(payload.get('n', -1))
 
         # Get the list of server replica hostnames to delete
-        hostnames: List[str] = list(payload.get('hostnames', []))
+        hostnames: List[str] = list(payload.get('servers', []))
 
         if n <= 0:
             raise Exception(
@@ -80,9 +80,13 @@ async def rm():
                    for shard, servers in shard_map.items()
                    if len(servers) == 1}
 
+        ic(singles)
+
         single_problems = {server: shard
                            for server, shard in singles.items()
                            if server in hostnames}
+
+        ic(single_problems)
 
         if len(single_problems) > 0:
             raise Exception(
@@ -104,13 +108,16 @@ async def rm():
             # remove `hostnames` from `choices`
             choices = list(choices - hostnames_set - singles.keys())
 
+            ic(choices)
+
             if (_k := len(choices) + len(hostnames)) < n:
                 raise Exception(
                     f'Not enough replicas to delete. '
                     f'Only {_k} replicas can be deleted.')
 
             # Choose `n - len(hostnames)` random hostnames from the list without replacement
-            random_hostnames = random.sample(choices, k=n - len(hostnames))
+            random_hostnames = random.sample(choices,
+                                             k=(n - len(hostnames)))
 
             # Add the random hostnames to the list of hostnames to delete
             hostnames.extend(random_hostnames)
