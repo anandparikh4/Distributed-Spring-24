@@ -38,7 +38,7 @@ async def server_config():
                     VALUES ($1::TEXT);
                 ''')
 
-                await stmt.executemany(shard_list)
+                await stmt.executemany((shard,) for shard in shard_list)
 
         response_payload['status'] = 'success'
 
