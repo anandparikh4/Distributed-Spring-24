@@ -24,8 +24,14 @@ def err_payload(err: Exception):
     """
     Generate an error payload.
     """
+    
+    if DEBUG:
+        print(f'{Fore.RED}ERROR | '
+              f'{err.__class__.__name__}: {err}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
 
     return {
-        'message': f'<Error> {err}',
+        'message': f'<Error> {err.__class__.__name__}: {err}',
         'status': 'failure'
     }

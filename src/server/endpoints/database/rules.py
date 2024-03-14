@@ -34,9 +34,5 @@ async def rules(
                     ''', shard_id, valid_at)
 
     except Exception as e:
-        if DEBUG:
-            print(f'{Fore.RED}ERROR | '
-                  f'{e}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
+
         raise e

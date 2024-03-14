@@ -36,7 +36,7 @@ def err_payload(err: Exception):
               file=sys.stderr)
 
     return {
-        'message': f'<Error> {err}',
+        'message': f'<Error> {err.__class__.__name__}: {err}',
         'status': 'failure'
     }
 # END err_payload
