@@ -6,7 +6,7 @@ start:
 	docker compose logs --follow
 
 stop:
-	docker compose kill --signal SIGTERM Load-Balancer
-	docker compose wait Load-Balancer
+	-docker compose kill --signal SIGTERM Load-Balancer
+	-docker compose wait Load-Balancer
 	docker compose down --remove-orphans
 

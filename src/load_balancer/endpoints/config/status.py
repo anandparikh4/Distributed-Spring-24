@@ -49,23 +49,29 @@ async def status():
             # END async with common.pool.acquire()
 
             servers_to_shards: Dict[str, List[str]] = {}
+            _shard_map = {k: v.getServerList() for k, v in shard_map.items()}
+            
+            ic(_shard_map)
 
-            for shard, servers in shard_map.items():
-                for server in servers.getServerList():
-                    if server not in servers_to_shards:
+            for shard, servers in _shard_map.items():
+                for server in servers:
+                    if server not in servers_to_shards.keys():
                         servers_to_shards[server] = []
                     servers_to_shards[server].append(shard)
                 # END for server in servers
             # END for shard, servers in shard_map.items()
+            
+            ic(servers_to_shards)
 
             # Return the response payload
             return jsonify(ic({
                 'N': len(replicas),
                 'shards': shards,
-                'servers': [{
-                    'id': serv_ids[server],
-                    'shards': shards,
-                } for server, shards in servers_to_shards.items()],
+                'servers': {
+                    server: {
+                        'id': serv_ids[server],
+                        'shards': shards
+                    } for server, shards in servers_to_shards.items()},
             })), 200
 
         # END async with lock

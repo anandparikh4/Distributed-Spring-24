@@ -171,6 +171,8 @@ async def copy_shards_to_container(
             # END for shard in shards
         # END async with conn.transaction()
     # END async with common.pool.acquire() as conn
+    
+    ic(call_server_shards)
 
     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -223,6 +225,8 @@ async def copy_shards_to_container(
             for shard_id, valid_at in server_shards:
                 all_data[shard_id] = (data[shard_id], valid_at)
         # END for (response, shards) in zip(copy_responses, call_server_shards.values())
+        
+        ic(all_data)
 
         # Call /write on server S to write the shard K
         # Define tasks
