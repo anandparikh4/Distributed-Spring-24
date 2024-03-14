@@ -131,7 +131,8 @@ async def rm():
                         # stop docker containers for the deleted hostnames
                         container = await docker.containers.get(hostname)
 
-                        await container.stop(timeout=STOP_TIMEOUT)
+                        await container.kill(signal='SIGTERM')
+                        await container.wait()
                         await container.delete(force=True)
 
                         if DEBUG:
