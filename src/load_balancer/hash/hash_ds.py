@@ -6,7 +6,6 @@ from .hash_functions import requestHashList, serverHashList
 
 # consistent hashing data structure
 
-
 class ConsistentHashMap:
 
     # constructor
@@ -23,8 +22,10 @@ class ConsistentHashMap:
         self.requestHash = request_hash
         self.serverHash = server_hash
 
-        # map: server-name -> server-index
+        # map: server-name -> server-id
         self.servers: dict[str, int] = {}
+        # map: server-name -> slots of virtual replicas
+        self.replicas: dict[str , list[int]] = {}
 
         # id of next server
         self.next_server: list[None | str] = [None] * n_slots
@@ -65,6 +66,7 @@ class ConsistentHashMap:
             raise KeyError("Hostid already present")
 
         self.servers[hostname] = hostid
+        self.replicas[hostname] = []
 
         for virtual_idx in range(self.n_virtual):
             server_hash = (self.serverHash(
@@ -75,7 +77,9 @@ class ConsistentHashMap:
             while slot in self.server_slots:
                 i += 1
                 slot = self.probe(server_hash, i) % self.n_slots
+            # insert in sorted ordered server_slots and list of virtual slots
             bisect.insort(self.server_slots, slot)
+            self.replicas[hostname].add(slot)
             i = 0
             while self.server_slots[i] != slot:
                 i += 1
@@ -103,16 +107,10 @@ class ConsistentHashMap:
         if (len(self.servers) == 0):
             self.next_server = [None] * self.n_slots
             self.server_slots = []
+            self.replicas.pop(hostname)
+            return
 
-        for virtual_idx in range(self.n_virtual):
-            server_hash = (self.serverHash(
-                hostid, virtual_idx + 1)) % self.n_slots
-            # Probing if there is collision
-            i = 0
-            slot = server_hash
-            while self.next_server[slot] != hostname:
-                i += 1
-                slot = self.probe(server_hash, i) % self.n_slots
+        for slot in self.replicas[hostname]:
             i = 0
             while self.server_slots[i] != slot:
                 i += 1
@@ -127,6 +125,8 @@ class ConsistentHashMap:
                 i = (i+1) % self.n_slots
             self.next_server[slot] = other_hostname
             self.server_slots.remove(slot)
+
+        self.replicas.pop(hostname)
 
     # find the server (by hostname) to which to route the request
     # Time Complexity : O(1)
