@@ -45,13 +45,8 @@ async def copy():
         async with common.pool.acquire() as conn:
             async with conn.transaction():
 
-                tasks = [asyncio.create_task(
-                    rules(
-                        conn,
-                        shard,
-                        valid_at_shard
-                    )
-                ) for shard, valid_at_shard in zip(shards, valid_at)]
+                tasks = [asyncio.create_task(rules(shard, valid_at_shard))
+                         for shard, valid_at_shard in zip(shards, valid_at)]
 
                 res = await asyncio.gather(*tasks, return_exceptions=True)
 

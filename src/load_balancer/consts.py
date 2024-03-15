@@ -30,6 +30,9 @@ REQUEST_BATCH_SIZE = 20
 # number of docker tasks to perform in a batch
 DOCKER_TASK_BATCH_SIZE = 10
 
+# random seed
+RANDOM_SEED = 42
+
 # Database constants
 DB_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
 DB_PORT = int(os.environ.get('POSTGRES_PORT', 5432))

@@ -45,7 +45,7 @@ async def data_write():
 
                 term = max(term, valid_at) + 1
 
-                await rules(conn, shard_id, valid_at)
+                await rules(shard_id, valid_at)
 
                 await conn.execute('''--sql
                     UPDATE StudT

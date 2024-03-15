@@ -79,7 +79,7 @@ class ConsistentHashMap:
                 slot = self.probe(server_hash, i) % self.n_slots
             # insert in sorted ordered server_slots and list of virtual slots
             bisect.insort(self.server_slots, slot)
-            self.replicas[hostname].add(slot)
+            self.replicas[hostname].append(slot)
             i = 0
             while self.server_slots[i] != slot:
                 i += 1

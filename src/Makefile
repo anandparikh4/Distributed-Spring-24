@@ -1,6 +1,5 @@
 start:
-	docker compose build
-	docker compose up --detach
+	docker compose up --build --detach
 	docker compose kill --signal SIGKILL Dummy-Server
 	docker compose rm Dummy-Server --force --stop
 	docker compose logs --follow

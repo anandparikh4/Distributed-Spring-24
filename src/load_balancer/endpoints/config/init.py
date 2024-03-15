@@ -183,6 +183,8 @@ async def init():
                     raise Exception('Failed to spawn containers')
             # END async with Docker
 
+            ic(serv_ids)
+
             await asyncio.sleep(0)
 
             # config the new shards

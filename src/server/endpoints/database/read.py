@@ -43,7 +43,7 @@ async def read():
         async with common.pool.acquire() as conn:
             async with conn.transaction():
 
-                await rules(conn, shard_id, valid_at)
+                await rules(shard_id, valid_at)
 
                 async for record in conn.cursor('''--sql
                     SELECT Stud_id, Stud_name, Stud_marks

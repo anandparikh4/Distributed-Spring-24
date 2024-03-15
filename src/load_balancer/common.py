@@ -16,18 +16,27 @@ from icecream import ic
 from consts import *
 from hash import ConsistentHashMap
 
+
 # Lock to protect the replicas list
 lock = FifoLock()
+
 
 # Postgres connection pool
 pool: asyncpg.Pool[asyncpg.Record]
 
+
 # Configure icecream output
 ic.configureOutput(prefix='[LB] | ')
+
 
 # Disable icecream debug messages if DEBUG is not set to true
 if not DEBUG:
     ic.disable()
+
+
+# seed random number generator in DEBUG mode
+if DEBUG:
+    random.seed(RANDOM_SEED)
 
 
 # List to store web server replica hostnames

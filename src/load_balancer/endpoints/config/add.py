@@ -122,7 +122,7 @@ async def add():
                     f'Shards `{problems}` are not defined in shard_map or new_shards')
 
             ic("To add: ", hostnames, new_shards)
-            
+
             # Add the shards to the shard_locks and shard_map
             for shard in new_shard_ids:
                 # Change to ConsistentHashMap
@@ -164,6 +164,10 @@ async def add():
                 # Wait for all tasks to complete
                 await asyncio.gather(*tasks, return_exceptions=True)
             # END async with Docker
+
+            ic(serv_ids)
+
+            await asyncio.sleep(0)
 
             # Copy shards to the new containers
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)

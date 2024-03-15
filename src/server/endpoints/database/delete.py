@@ -48,7 +48,7 @@ async def delete():
                 term = max(term, valid_at) + 1
 
                 # Apply rules
-                await rules(conn,shard_id, valid_at)
+                await rules(shard_id, valid_at)
 
                 # Update the deleted_at field
                 await conn.execute('''--sql

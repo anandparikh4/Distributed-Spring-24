@@ -62,7 +62,7 @@ async def write():
 
                     term = max(term, valid_at) + 1
 
-                    await rules(conn, shard_id, valid_at)
+                    await rules(shard_id, valid_at)
 
                 await stmt.executemany([(record_dict['stud_id'],
                                          record_dict['stud_name'],
