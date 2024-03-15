@@ -40,12 +40,12 @@ async def read():
 
         # Get the data from the database
         response_payload = {'data': [], 'status': 'success'}
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
 
-                await rules(shard_id, valid_at)
+                await rules(conn, shard_id, valid_at)
 
-                async for record in connection.cursor('''--sql
+                async for record in conn.cursor('''--sql
                     SELECT Stud_id, Stud_name, Stud_marks
                     FROM StudT
                     WHERE shard_id = $1

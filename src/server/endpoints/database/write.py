@@ -40,9 +40,9 @@ async def write():
         admin = str(payload.get('admin', 'false')).lower() == 'true'
 
         # Insert the data into the database
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
-                stmt = await connection.prepare('''--sql
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                stmt = await conn.prepare('''--sql
                     INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at)
                     VALUES ($1::INTEGER, 
                             $2::TEXT, 
@@ -54,7 +54,7 @@ async def write():
                 if admin:
                     term = valid_at
                 else:
-                    term: int = await connection.fetchval('''--sql
+                    term: int = await conn.fetchval('''--sql
                         SELECT term 
                         FROM TermT
                         WHERE shard_id = $1::TEXT;                         
@@ -62,7 +62,7 @@ async def write():
 
                     term = max(term, valid_at) + 1
 
-                    await rules(shard_id, valid_at)
+                    await rules(conn, shard_id, valid_at)
 
                 await stmt.executemany([(record_dict['stud_id'],
                                          record_dict['stud_name'],
@@ -71,7 +71,7 @@ async def write():
                                          term)
                                         for record_dict in data])
 
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     UPDATE TermT
                     SET term = $1::INTEGER
                     WHERE shard_id = $2::TEXT;

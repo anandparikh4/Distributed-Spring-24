@@ -35,9 +35,9 @@ async def data_write():
         data = dict(payload.get('data', {}))
 
         # Insert the data into the database
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
-                term: int = await connection.fetchval('''--sql
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                term: int = await conn.fetchval('''--sql
                     SELECT term 
                     FROM TermT
                     WHERE shard_id = $1::TEXT;                         
@@ -45,9 +45,9 @@ async def data_write():
 
                 term = max(term, valid_at) + 1
 
-                await rules(shard_id, valid_at)
+                await rules(conn, shard_id, valid_at)
 
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     UPDATE StudT
                     SET deleted_at = $1::INTEGER
                     WHERE stud_id = $2::INTEGER
@@ -57,7 +57,7 @@ async def data_write():
 
                 term += 1
 
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at)
                     VALUES ($1::INTEGER, 
                             $2::TEXT, 
@@ -66,7 +66,7 @@ async def data_write():
                             $5::INTEGER);
                 ''', data['stud_id'], data['stud_name'], data['stud_marks'], shard_id, term)
 
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     UPDATE TermT
                     SET term = $1::INTEGER
                     WHERE shard_id = $2::TEXT;                    

@@ -1,6 +1,7 @@
 from common import *
 import common
 
+
 class Read(asyncio.Future):
     @staticmethod
     def is_compatible(holds):
@@ -28,11 +29,10 @@ def err_payload(err: Exception):
     """
     Generate an error payload.
     """
-    
+
     if DEBUG:
         print(f'{Fore.RED}ERROR | '
-              f'{err.__class__.__name__}\n'
-              f'{err}\n'
+              f'{err.__class__.__name__}: {err}\n'
               f'{err.__traceback__}\n'
               f'{Style.RESET_ALL}',
               file=sys.stderr)

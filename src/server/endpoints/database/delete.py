@@ -35,10 +35,10 @@ async def delete():
         stud_id = int(payload.get('stud_id', -1))
 
         # Delete data from the database
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
                 # Get the term
-                term: int = await connection.fetchval('''--sql
+                term: int = await conn.fetchval('''--sql
                     SELECT term
                     FROM TermT
                     WHERE shard_id = $1::TEXT;                         
@@ -48,10 +48,10 @@ async def delete():
                 term = max(term, valid_at) + 1
 
                 # Apply rules
-                await rules(shard_id, valid_at)
+                await rules(conn,shard_id, valid_at)
 
                 # Update the deleted_at field
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     UPDATE StudT
                     SET deleted_at = $1::INTEGER
                     WHERE stud_id = $2::INTEGER 
@@ -60,7 +60,7 @@ async def delete():
                 ''', term, stud_id, shard_id, valid_at)
 
                 # Save the term in the TermT table
-                await connection.execute('''--sql
+                await conn.execute('''--sql
                     UPDATE TermT
                     SET term = $1::INTEGER
                     WHERE shard_id = $2::TEXT;

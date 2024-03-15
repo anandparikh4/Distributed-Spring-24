@@ -31,9 +31,9 @@ async def server_config():
 
         # Add to the database
         response_payload = {}
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
-                stmt = await connection.prepare('''--sql
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                stmt = await conn.prepare('''--sql
                     INSERT INTO TermT (shard_id)
                     VALUES ($1::TEXT);
                 ''')

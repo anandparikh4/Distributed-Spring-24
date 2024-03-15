@@ -42,11 +42,16 @@ async def copy():
             response_payload[shard] = []
 
         # Get the data from the database
-        async with common.pool.acquire() as connection:
-            async with connection.transaction():
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
 
-                tasks = [asyncio.create_task(rules(shard, valid_at_shard))
-                         for shard, valid_at_shard in zip(shards, valid_at)]
+                tasks = [asyncio.create_task(
+                    rules(
+                        conn,
+                        shard,
+                        valid_at_shard
+                    )
+                ) for shard, valid_at_shard in zip(shards, valid_at)]
 
                 res = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -56,7 +61,7 @@ async def copy():
                 # for shard in shards:
                 #     await rules(shard, valid_at)
 
-                stmt = await connection.prepare(
+                stmt = await conn.prepare(
                     '''--sql
                     SELECT Stud_id, Stud_name, Stud_marks
                     FROM StudT
