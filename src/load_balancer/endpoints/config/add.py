@@ -193,7 +193,7 @@ async def add():
 
             if len(new_shards) > 0:
                 async with common.pool.acquire() as conn:
-                    async with conn.transaction(isolation='serializable'):
+                    async with conn.transaction():
                         stmt = await conn.prepare(
                             '''--sql
                             INSERT INTO shardT (
@@ -203,7 +203,7 @@ async def add():
                             VALUES (
                                 $1::INTEGER,
                                 $2::TEXT,
-                                $3::INTEGER)
+                                $3::INTEGER);
                             ''')
 
                         await stmt.executemany(

@@ -82,10 +82,7 @@ async def read():
 
         async with common.lock(Read):
             async with common.pool.acquire() as conn:
-                async with conn.transaction(
-                        isolation='serializable',
-                        readonly=True,
-                        deferrable=True):
+                async with conn.transaction():
                     async for record in conn.cursor(
                         '''--sql
                         SELECT
@@ -96,7 +93,9 @@ async def read():
                         WHERE
                             (stud_id_low <= ($2::INTEGER)) AND
                             (($1::INTEGER) < stud_id_low + shard_size)
-                        ''', low, high):
+                        FOR SHARE;
+                        ''',
+                        low, high):
 
                         shard_ids.append(record["shard_id"])
                         shard_valid_ats.append(record["valid_at"])

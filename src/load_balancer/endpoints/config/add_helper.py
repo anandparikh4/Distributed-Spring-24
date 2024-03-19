@@ -140,10 +140,7 @@ async def copy_shards_to_container(
 
     # For each shard K in `shards`:
     async with common.pool.acquire() as conn:
-        async with conn.transaction(
-                isolation='serializable',
-                readonly=True,
-                deferrable=True):
+        async with conn.transaction():
             stmt = await conn.prepare(
                 '''--sql
                 SELECT
@@ -151,7 +148,7 @@ async def copy_shards_to_container(
                 FROM
                     ShardT
                 WHERE
-                    shard_id = $1::TEXT
+                    shard_id = $1::TEXT;
                 ''')
 
             for shard in shards:

@@ -4,7 +4,6 @@ from common import *
 
 # All rules for enforcing synchronization between shard replicas across servers
 # Simply do 'await rules(shard_id, term)' in each operation. No return value
-# MUST BE CALLED WITHIN A TRANSACTION CONTEXT
 async def rules(
     shard_id: str,
     valid_at: int

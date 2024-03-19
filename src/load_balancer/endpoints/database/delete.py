@@ -60,7 +60,7 @@ async def delete():
 
         async with common.lock(Read):
             async with common.pool.acquire() as conn:
-                async with conn.transaction(isolation='serializable'):
+                async with conn.transaction():
                     record = await conn.fetchrow(
                         '''--sql
                         SELECT
@@ -71,6 +71,7 @@ async def delete():
                         WHERE
                             (stud_id_low <= ($1::INTEGER)) AND
                             (($1::INTEGER) < stud_id_low + shard_size)
+                        FOR UPDATE;
                         ''',
                         stud_id)
 

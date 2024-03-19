@@ -70,8 +70,20 @@ async def write():
 
         async with common.lock(Read):
             async with common.pool.acquire() as conn:
-                async with conn.transaction(isolation='serializable'):
-                    get_shard_info_stmt = await conn.prepare(
+                async with conn.transaction():
+                    get_shard_id_stmt = await conn.prepare(
+                        '''--sql
+                        SELECT
+                            shard_id,
+                            valid_at
+                        FROM
+                            ShardT
+                        WHERE
+                            (stud_id_low <= ($1::INTEGER)) AND
+                            (($1::INTEGER) < stud_id_low + shard_size);
+                        ''')
+
+                    get_valid_at_stmt = await conn.prepare(
                         '''--sql
                         SELECT
                             shard_id,
@@ -81,6 +93,7 @@ async def write():
                         WHERE
                             (stud_id_low <= ($1::INTEGER)) AND
                             (($1::INTEGER) < stud_id_low + shard_size)
+                        FOR UPDATE;
                         ''')
 
                     update_shard_info_stmt = await conn.prepare(
@@ -90,7 +103,7 @@ async def write():
                         SET
                             valid_at = ($1::INTEGER)
                         WHERE
-                            shard_id = ($2::TEXT)
+                            shard_id = ($2::TEXT);
                         ''')
 
                     for entry in data:
@@ -99,7 +112,7 @@ async def write():
 
                         if record is None:
                             raise Exception(
-                                f'stud_id {stud_id} does not exist')
+                                f'Shard for {stud_id} does not exist')
 
                         shard_id: str = record["shard_id"]
                         shard_valid_at: int = record["valid_at"]

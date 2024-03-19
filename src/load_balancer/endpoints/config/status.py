@@ -28,10 +28,7 @@ async def status():
             shards: List[Dict[str, Any]] = []
 
             async with common.pool.acquire() as conn:
-                async with conn.transaction(
-                        isolation='serializable',
-                        readonly=True,
-                        deferrable=True):
+                async with conn.transaction(readonly=True):
                     stmt = await conn.prepare(
                         '''--sql
                             SELECT
