@@ -127,7 +127,6 @@ async def add():
             for shard in new_shard_ids:
                 # Change to ConsistentHashMap
                 shard_map[shard] = ConsistentHashMap()
-                shard_locks[shard] = FifoLock()
             # END for shard in new_shards
 
             # Spawn new containers

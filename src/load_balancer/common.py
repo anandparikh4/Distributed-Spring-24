@@ -55,8 +55,3 @@ serv_ids: Dict[str, int] = {}
 # To be filled by the load balancer with use
 # TODO: change to Dict[str, ConsistentHashMap]
 shard_map: Dict[str, ConsistentHashMap] = {}
-
-
-# Shard Name to FifoLock
-# To be filled by the load balancer with use
-shard_locks: Dict[str, FifoLock] = {}

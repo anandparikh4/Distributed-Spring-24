@@ -95,7 +95,7 @@ async def read():
                             (($1::INTEGER) < stud_id_low + shard_size)
                         FOR SHARE;
                         ''',
-                        low, high):
+                            low, high):
 
                         shard_ids.append(record["shard_id"])
                         shard_valid_ats.append(record["valid_at"])
@@ -103,25 +103,25 @@ async def read():
 
                     if len(shard_ids) == 0:
                         raise Exception('No data entries found')
-                # END async with conn.transaction()
-            # END async with common.pool.acquire()
 
-            data = []
+                    data = []
 
-            for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
-                if len(shard_map[shard_id]) > 0:
-                    # TODO: Change to ConsistentHashMap
-                    server_name = shard_map[shard_id].find(get_request_id())
+                    for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
+                        if len(shard_map[shard_id]) == 0:
+                            continue
 
-                    async with shard_locks[shard_id](Read):
+                        # TODO: Change to ConsistentHashMap
+                        server_name = shard_map[shard_id].find(
+                            get_request_id())
+
                         # Convert to aiohttp request
                         timeout = aiohttp.ClientTimeout(
                             connect=REQUEST_TIMEOUT)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
                             task = asyncio.create_task(
                                 read_get_wrapper(
-                                    session,
-                                    server_name,
+                                    session=session,
+                                    server_name=server_name,
                                     json_payload={
                                         "shard": shard_id,
                                         "stud_id": stud_id,
@@ -139,9 +139,9 @@ async def read():
 
                         serv_response = dict(await serv_response.json())
                         data.extend(serv_response["data"])
-                    # END async with shard_locks[shard_id](Read)
-                # END if len(shard_map[shard_id]) > 0
-            # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
+                    # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
+                # END async with conn.transaction()
+            # END async with common.pool.acquire()
         # END async with common.lock(Read)
 
         # Return the response payload
