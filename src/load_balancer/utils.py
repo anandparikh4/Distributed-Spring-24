@@ -56,7 +56,7 @@ def get_container_config(
         'detach': True,
         'env': [
             f'SERVER_ID={serv_id:06}',
-            'DEBUG=true',
+            f'DEBUG={str(DEBUG).lower()}',
             'POSTGRES_HOST=localhost',
             'POSTGRES_PORT=5432',
             'POSTGRES_USER=postgres',

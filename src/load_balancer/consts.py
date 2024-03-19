@@ -13,10 +13,10 @@ MAX_HEARTBEAT_FAIL_COUNT = 5
 HEARTBEAT_INTERVAL = 10
 
 # max number of consecutive heartbeat fails [for config endpoint only]
-MAX_CONFIG_FAIL_COUNT = 5
+MAX_CONFIG_FAIL_COUNT = 50
 
 # interval between heartbeat checks in seconds [for config endpoint only]
-HEARTBEAT_CONFIG_INTERVAL = 1
+HEARTBEAT_CONFIG_INTERVAL = 2
 
 # timeout for stopping a container in seconds
 STOP_TIMEOUT = 5

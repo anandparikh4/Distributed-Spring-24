@@ -105,20 +105,20 @@ async def read():
                         raise Exception('No data entries found')
 
                     data = []
+                    tasks = []
 
-                    for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
-                        if len(shard_map[shard_id]) == 0:
-                            continue
+                    # Convert to aiohttp request
+                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
+                            if len(shard_map[shard_id]) == 0:
+                                continue
 
-                        # TODO: Change to ConsistentHashMap
-                        server_name = shard_map[shard_id].find(
-                            get_request_id())
+                            # TODO: Change to ConsistentHashMap
+                            server_name = shard_map[shard_id].find(
+                                get_request_id())
 
-                        # Convert to aiohttp request
-                        timeout = aiohttp.ClientTimeout(
-                            connect=REQUEST_TIMEOUT)
-                        async with aiohttp.ClientSession(timeout=timeout) as session:
-                            task = asyncio.create_task(
+                            tasks.append(asyncio.create_task(
                                 read_get_wrapper(
                                     session=session,
                                     server_name=server_name,
@@ -128,18 +128,22 @@ async def read():
                                         "valid_at": shard_valid_at
                                     }
                                 )
-                            )
-                            serv_response = await asyncio.gather(*[task], return_exceptions=True)
-                            serv_response = serv_response[0] if not isinstance(
-                                serv_response[0], BaseException) else None
-                        # END async with aiohttp.ClientSession(timeout=timeout) as session
+                            ))
+                        # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
 
-                        if serv_response is None or serv_response.status != 200:
+                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                        serv_response = [None if isinstance(r, BaseException)
+                                         else r for r in serv_response]
+                    # END async with aiohttp.ClientSession(timeout=timeout) as session
+
+                    for r in serv_response:
+                        if r is None or r.status != 200:
                             raise Exception('Failed to read data entry')
+                            
+                        _r = dict(await r.json())
+                        data.extend(_r["data"])
+                    # END for r in serv_response
 
-                        serv_response = dict(await serv_response.json())
-                        data.extend(serv_response["data"])
-                    # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
                 # END async with conn.transaction()
             # END async with common.pool.acquire()
         # END async with common.lock(Read)
