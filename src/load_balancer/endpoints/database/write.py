@@ -85,6 +85,7 @@ async def write():
                     get_valid_at_stmt = await conn.prepare(
                         '''--sql
                         SELECT
+                            shard_id,
                             valid_at
                         FROM
                             ShardT
@@ -109,7 +110,7 @@ async def write():
 
                         if record is None:
                             raise Exception(
-                                f'Shard for {stud_id} does not exist')
+                                f'Shard for {stud_id = } does not exist')
 
                         shard_id: str = record["shard_id"]
 
@@ -120,8 +121,8 @@ async def write():
                     # END for entry in data
 
                     async for row in get_valid_at_stmt.cursor(list(shard_data.keys())):
-                        shard_data[row["shard_id"]] = (
-                            shard_data[row["shard_id"]][0], row["valid_at"])
+                        shard_data[row["shard_id"]] = (shard_data[row["shard_id"]][0],
+                                                       row["valid_at"])
 
                     for shard_id in shard_data:
                         # TODO: Chage to ConsistentHashMap
