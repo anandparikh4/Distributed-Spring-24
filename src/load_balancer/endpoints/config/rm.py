@@ -51,15 +51,18 @@ async def rm():
     await asyncio.sleep(0)
 
     try:
-        # Get the request payload
-        payload = dict(await request.get_json())
-        ic(payload)
+        # Convert the reponse to json object
+        response_json = await request.get_json()
 
-        if payload is None:
+        if response_json is None:
             raise Exception('Payload is empty')
 
+        # Convert the json response to dictionary
+        payload = dict(response_json)
+        ic(payload)
+
         # Get the number of servers to delete
-        n = int(payload.get('n', -1))
+        n = int(payload.get('N', -1))
 
         # Get the list of server replica hostnames to delete
         hostnames: List[str] = list(payload.get('servers', []))
@@ -90,8 +93,8 @@ async def rm():
 
         if len(single_problems) > 0:
             raise Exception(
-                f'Only one copy of shards `{single_problems.values()}` is '
-                f'present in the hostnames `{single_problems.keys()}` '
+                f'Only one copy of shards `{list(single_problems.values())}` is '
+                f'present in the hostnames `{list(single_problems.keys())}` '
                 f'to delete, respectively.')
 
         async with common.lock(Write):

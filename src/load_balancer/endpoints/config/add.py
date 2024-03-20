@@ -62,12 +62,15 @@ async def add():
     await asyncio.sleep(0)
 
     try:
-        # Get the request payload
-        payload = dict(await request.get_json())
-        ic(payload)
+        # Convert the reponse to json object
+        response_json = await request.get_json()
 
-        if payload is None:
+        if response_json is None:
             raise Exception('Payload is empty')
+
+        # Convert the json response to dictionary
+        payload = dict(response_json)
+        ic(payload)
 
         # Get the number of servers to add
         n = int(payload.get('N', -1))
