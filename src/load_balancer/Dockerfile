@@ -38,17 +38,17 @@ ENV PYTHONPATH "/opt/venv/lib/python3.11/site-packages:$PYTHONPATH"
 ENV PYTHONUNBUFFERED 1
 
 # Entry point
-COPY my-entrypoint.sh /usr/local/bin/
+COPY --chmod=777 my-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["my-entrypoint.sh"]
 
 # Set the working directory
 WORKDIR /app
 
 # Set the init scripts
-COPY init/ /docker-entrypoint-initdb.d/
+COPY --chmod=777 init/ /docker-entrypoint-initdb.d/
 
 # Copy the application
-COPY . .
+COPY --chmod=777 . .
 
 # Deploy the application
 CMD ["./deploy.sh"]

@@ -3,6 +3,7 @@ set -x
 set -e
 
 postgres &
+while ! pg_isready ; do sleep 1; done
 python server.py &
 
 jobs_array=$(jobs -p | tr '\n' ' ')

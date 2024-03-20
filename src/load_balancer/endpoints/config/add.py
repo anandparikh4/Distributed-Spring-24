@@ -70,7 +70,7 @@ async def add():
             raise Exception('Payload is empty')
 
         # Get the number of servers to add
-        n = int(payload.get('n', -1))
+        n = int(payload.get('N', -1))
 
         # Get the list of server replica hostnames to add
         servers: Dict[str, List[str]] = dict(payload.get('servers', {}))
