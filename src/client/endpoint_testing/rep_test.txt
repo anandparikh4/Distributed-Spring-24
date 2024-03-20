@@ -1,0 +1,21 @@
+GET /rep
+
+1. Success
+
+Payload Json = EMPTY
+
+Response Json = 
+{
+    "message": {
+        "N": 6,
+        "replicas": [
+            "Server0",
+            "Server1",
+            "Server3",
+            "Server4",
+            "Server5",
+            "Server6"
+        ]
+    },
+    "status": "successful"
+}
