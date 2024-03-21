@@ -32,11 +32,24 @@ async def data_write():
 
         valid_at = int(payload.get('valid_at', -1))
         shard_id = str(payload.get('shard', -1))
+        stud_id = str(payload.get('stud_id', -1))
         data = dict(payload.get('data', {}))
 
         # Insert the data into the database
         async with common.pool.acquire() as conn:
             async with conn.transaction():
+                await rules(shard_id, valid_at)
+
+                # Check if stud_id exists
+                row = await conn.fetchrow('''--sql
+                    SELECT *
+                    FROM StudT
+                    WHERE stud_id = $1::INTEGER;
+                ''', stud_id)
+
+                if row is not None:
+                    raise Exception(f"Failed to update")
+
                 term: int = await conn.fetchval('''--sql
                     SELECT term 
                     FROM TermT
@@ -44,8 +57,6 @@ async def data_write():
                 ''', shard_id)
 
                 term = max(term, valid_at) + 1
-
-                await rules(shard_id, valid_at)
 
                 await conn.execute('''--sql
                     UPDATE StudT

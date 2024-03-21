@@ -109,7 +109,6 @@ async def delete():
                     # END async with aiohttp.ClientSession
 
                     max_valid_at = shard_valid_at
-                    max_rows_deleted = 0
                     # If all replicas are not updated, then return an error
                     for r in serv_response:
                         if r is None or r.status != 200:
@@ -118,7 +117,6 @@ async def delete():
                         resp = dict(await r.json())
                         cur_valid_at = int(resp["valid_at"])
                         max_valid_at = max(max_valid_at, cur_valid_at)
-                        max_rows_deleted = max(max_rows_deleted, int(resp["rows_updated"]))
                     # END for r in serv_response
 
                     await conn.execute(
@@ -138,16 +136,10 @@ async def delete():
         # END async with common.lock(Read)
 
         # Return the response payload
-        if max_rows_deleted == 0:
-            return jsonify(ic({
-                'message': f"Data entry with stud_id: {stud_id} does not exist",
-                'status': 'success'
-            })), 200
-        else:
-            return jsonify(ic({
-                'message': f"Data entry with stud_id: {stud_id} removed from all replicas",
-                'status': 'success'
-            })), 200
+        return jsonify(ic({
+            'message': f"Data entry with stud_id: {stud_id} removed from all replicas",
+            'status': 'success'
+        })), 200
 
     except Exception as e:
 

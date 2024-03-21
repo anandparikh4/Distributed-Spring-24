@@ -68,11 +68,14 @@ async def update():
 
         if len(data) == 0:
             raise Exception('Payload does not contain `data` field')
-
+        
         if not all(k in data.keys()
                    for k in
                    ["stud_id", "stud_name", "stud_marks"]):
             raise Exception('Data entry is invalid')
+        
+        if stud_id != data["stud_id"]:
+            raise Exception("Cannot change stud_id field")
 
         async with common.lock(Read):
             async with common.pool.acquire() as conn:

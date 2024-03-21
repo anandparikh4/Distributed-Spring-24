@@ -39,6 +39,8 @@ async def write():
 
         admin = str(payload.get('admin', 'false')).lower() == 'true'
 
+        stud_ids = [_data["stud_id"] for _data in data]
+
         # Insert the data into the database
         async with common.pool.acquire() as conn:
             async with conn.transaction():
@@ -54,6 +56,18 @@ async def write():
                 if admin:
                     term = valid_at
                 else:
+                    await rules(shard_id, valid_at)
+
+                    # Check if stud_id exists
+                    row = await conn.fetchrow('''--sql
+                        SELECT *
+                        FROM StudT
+                        WHERE stud_id = ANY($1::INTEGER[]);
+                    ''', stud_ids)
+
+                    if row is not None:
+                        raise Exception(f"Failed to write")
+
                     term: int = await conn.fetchval('''--sql
                         SELECT term 
                         FROM TermT
@@ -62,7 +76,6 @@ async def write():
 
                     term = max(term, valid_at) + 1
 
-                    await rules(shard_id, valid_at)
 
                 await stmt.executemany([(record_dict['stud_id'],
                                          record_dict['stud_name'],
