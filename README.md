@@ -1,4 +1,4 @@
-# Distributed-Assignment-1
+# Distributed-Assignment-2
 
 ## Members
 * Utsav Basu - 20CS30057
@@ -7,7 +7,12 @@
 * Anand Manojkumar Parikh - 20CS10007
 
 ## How to run
-We have supplied a [Makefile](./src/Makefile) in the `./src` directory.
+Before starting, permissions for `docker.sock` have to be updated.
+```shell
+sudo chmod 777 <location of docker.sock> # usually the location is /var/run/docker.sock
+```
+
+There is a [Makefile](./src/Makefile) in the `./src` directory.
 To start everything:
 ```shell
 make
@@ -17,98 +22,10 @@ To stop everything:
 make stop
 ```
 
-## Testing 
-Two python files can be used for testing the application. These are as follows:
-1. `client.py`: It is a commandline interface to send requests to the load balancer end points.
-    * `/rep`: `rep`
-    * `/home`: `home`
-    * `/add`: `add <count:int> [<name:string>] ...` (eg. add 5 hello \<space> world)
-    * `/rm`: `del <count:int> [<name:string>] ...` (eg. del 5 hello \<space> world)
-    * `/<path:path>`: `<path>` (eg. hello/world)
-
-    Run it using:
-    ``` shell
-    python client.py
-    ```
-
-1. `tester.py`: It sends 10000 requests to the load balancer and saves the bar chart plot of the number of requests sent to each server in folder `./plots`.
-    Run it using:
-    ``` shell
-    python tester.py <num:int> # num: the number of server replicas
-    ```
-
 ## Analysis
-### A-1
-The load balancer is tested for 10000 requests with N = 3 servers. The distribution of requests among the 3 servers is shown by the following bar charts. These are generated using `tester.py`.
 
-#### With Given Hash Function:
-![](./plots/plot-3-0.jpg)
-
-#### With Modified Hash Function:
-![](./plots/plot-3-1.jpg)
-
-#### With Cryptographic Hash Function:
-![](./plots/plot-3-2.jpg)
-
-### A-2
-The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server replicas. The line charts below plot the standard deviation of the number of requests sent to each server.
-
-#### With Given Hash Function:
-![](./plots/SD-0.jpg)
-
-#### With Modified Hash Function:
-![](./plots/SD-1.jpg)
-
-#### With Cryptographic Hash Function:
-![](./plots/SD-2.jpg)
-
-### A-3
-The load balancer is tested for all the endpoints and the corresponding logs of both the server side and the client side are given below. This testing is done using `client.py`.
-* `rep`
-    * [Client-side](./plots/rep-req.png) 
-    * [Server-side](./plots/rep-res.png)
-
-* `add` normal
-    * [Client-side](./plots/add-req.png) 
-    * [Server-side](./plots/add-res.png)
-
-* `add` faulty
-    * [Client-side](./plots/add-faulty-req.png) 
-    * [Server-side](./plots/add-faulty-res.png)
-
-* `del` normal
-    * [Client-side](./plots/del-req.png) 
-    * [Server-side](./plots/del-res.png)
-
-* `del` faulty
-    * [Client-side](./plots/del-faulty-req.png) 
-    * [Server-side](./plots/del-faulty-res.png)
-
-* `home` 
-    * [Client-side](./plots/home-req.png) 
-    * [Server-side](./plots/home-res.png)
-
-* `other`
-    * [Client-side](./plots/oth-req.png) 
-    * [Server-side](./plots/oth-res.png)
-
-### A-4
-Three pairs of hash functions have been used and can be found in `./src/load-balancer/hash/hash_functions.py`.
-
-#### Given Hash Function
->$H(i) = i^2 + 2i + 17$
-
->$\phi(i, j) = i^2 + j^2 + 2j + 25$
-
-#### Modified Hash Function
-The coefficients are large and prime to cover the whole slot-space nearly uniformly with larger distance between virtual copies and so that taking modulo by any slot size does not reduce randomness.
-
->$H(i) = 1427i^2 + 2503i + 2003$
-
->$\phi(i, j) = 1249i^2 + 2287j^2 + 1663j + 2287$
-
-#### Cyrptographic Hash Function
-SHA-256 has been used for both $H$ and $\phi$
+## Data Generation
+In the `./src/client/data` directory, there are two files [fnames.txt](./src/client/data/fnames.txt) and [lnames.txt](./src/client/data/lnames.txt). `fnames.txt` contains `942` unique first names and `lnames.txt` contains `995` unique last names. Using these names, [generate.py](./src/client/generate.py) creates `942 * 995 = 937290` data entries with marks generated unformly at random in the range from `1` to `100`. 
 
 ## Main Libraries Used
 ### [Quart](https://pgjones.gitlab.io/quart/)
@@ -124,7 +41,10 @@ The aiohttp library is used for bulilding asynchronous HTTP client/server for as
 The aiodocker library is a simple docker HTTP API wrapper written with asyncio and aiohttp. Rather than making system calls inside the load balancer to perform docker related tasking like adding or removing server containers, aiodocker exposes functions with loads of flexibilities to perform these tasks.
 
 ### [fifolock](https://github.com/michalc/fifolock)
-This library is used for controlling concurrent read/writes to two important data structures used in the application. One of these data structures is used for mapping requests to virtual servers by consistent hasing. The other maintains the count of failed heartbeats for the servers.  
+This library is used for controlling concurrent read/writes to two important data structures used in the application. One of these data structures is used for mapping requests to virtual servers by consistent hasing. The other maintains the count of failed heartbeats for the servers.
+
+### [asyncpg](https://magicstack.github.io/asyncpg/current/)
+Asyncpg is a high-performance, asynchronous PostgreSQL database client library for Python. It is designed to provide efficient and low-latency communication with a PostgreSQL database by leveraging the power of Python's asyncio framework.
 
 ## Design Choices
 Different design choices have been made throughout the application, keeping in mind efficiency, functionality and understandability. Some of these are given below:
