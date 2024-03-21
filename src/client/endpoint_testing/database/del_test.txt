@@ -20,10 +20,62 @@ Response Json =
     "status": "failure"
 }
 
-3. `stud_id` does not exist
+3. `stud_id` does not exist [Due to load balancer]
 
-Prerequisite = Default configuration via POST at /init
-               POST /write with paylod: 
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+
+
+Payload Json = 
+{
+    "stud_id": 4096
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: stud_id 4096 does not exist",
+    "status": "failure"
+}
+
+4. `stud_id` does not exist [Due to server]
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+               POST /write with payload:
                {
                     "data": [
                         {
@@ -41,7 +93,41 @@ Prerequisite = Default configuration via POST at /init
 
 Payload Json = 
 {
-    "stud_id": 2
+    "stud_id": 5 
 }
 
-            
+Response Json =
+{
+    "message": "Data entry with stud_id: 5 does not exist",
+    "status": "success"
+}
+
+5. Success
+
+Prerequisite = Default configuration via POST at /init
+               POST /write with payload: 
+               {
+                    "data": [
+                        {
+                            "stud_id": 0,
+                            "stud_name": "Booker Dewitt",
+                            "stud_marks": 87
+                        },
+                        {
+                            "stud_id": 1,
+                            "stud_name": "Max Payne",
+                            "stud_marks": 96
+                        }
+                    ]
+                }
+
+Payload Json = 
+{
+    "stud_id": 0
+}
+
+Response Json =
+{
+    "message": "Data entry with stud_id: 0 removed from all replicas",
+    "status": "success"
+}
