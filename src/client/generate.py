@@ -24,7 +24,7 @@ class Person:
     marks: int
 
 
-def generate_people(n: int) -> List[Person]:
+def generate_people(n = len(all_names)) -> List[Person]:
     people = []
     names = random.sample(all_names, n)
     for i, name in zip(range(n), names):
@@ -33,7 +33,7 @@ def generate_people(n: int) -> List[Person]:
     return people
 
 
-all_data = generate_people(4096*4)
+all_data = generate_people()
 
 # Write to CSV
 with open('data/people.csv', 'w', newline='') as file:

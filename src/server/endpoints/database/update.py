@@ -32,7 +32,7 @@ async def data_write():
 
         valid_at = int(payload.get('valid_at', -1))
         shard_id = str(payload.get('shard', -1))
-        stud_id = str(payload.get('stud_id', -1))
+        stud_id = int(payload.get('stud_id', -1))
         data = dict(payload.get('data', {}))
 
         # Insert the data into the database
@@ -47,7 +47,7 @@ async def data_write():
                     WHERE stud_id = $1::INTEGER;
                 ''', stud_id)
 
-                if row is not None:
+                if row is None:
                     raise Exception(f"Failed to update")
 
                 term: int = await conn.fetchval('''--sql

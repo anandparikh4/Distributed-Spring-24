@@ -47,8 +47,8 @@ async def delete():
                     WHERE stud_id = $1::INTEGER;
                 ''', stud_id)
 
-                if row is not None:
-                    raise Exception(f"Failed to delete")
+                if row is None:
+                    raise Exception(f"Failed to delete")              
 
                 # Get the term
                 term: int = await conn.fetchval('''--sql

@@ -113,6 +113,8 @@ async def delete():
                     for r in serv_response:
                         if r is None or r.status != 200:
                             raise Exception('Failed to delete data entry')
+                        
+                        ic(r)
 
                         resp = dict(await r.json())
                         cur_valid_at = int(resp["valid_at"])
