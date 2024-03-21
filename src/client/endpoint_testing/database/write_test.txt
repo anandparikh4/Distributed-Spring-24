@@ -43,7 +43,100 @@ Response Json =
     "status": "failure"
 }
 
-4. Success
+4. Write a student id outside the range for all shards
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+
+Payload Json = 
+{
+    "data": [
+        {
+            "stud_id": 4096,
+            "stud_name": "Tom Cruise",
+            "stud_marks": 89
+        }
+    ]
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Shard for stud_id = 4096 does not exist",
+    "status": "failure"
+}
+
+5. Write with an existing student id
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+               POST /write with payload:
+               {
+                    "data": [
+                        {
+                            "stud_id": 0,
+                            "stud_name": "Booker Dewitt",
+                            "stud_marks": 87
+                        },
+                        {
+                            "stud_id": 1,
+                            "stud_name": "Max Payne",
+                            "stud_marks": 96
+                        }
+                    ]
+                }
+
+Payload Json = 
+{
+    "data": [
+        {
+            "stud_id": 0,
+            "stud_name": "Tom Cruise",
+            "stud_marks": 89
+        }
+    ]
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Failed to write all data entries",
+    "status": "failure"
+}
+
+6. Success
 
 Prerequisite = Default configuration via POST at /init.
 

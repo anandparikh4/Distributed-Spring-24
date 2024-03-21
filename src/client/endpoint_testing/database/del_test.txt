@@ -98,8 +98,8 @@ Payload Json =
 
 Response Json =
 {
-    "message": "Data entry with stud_id: 5 does not exist",
-    "status": "success"
+    "message": "<Error> Exception: Failed to delete data entry",
+    "status": "failure"
 }
 
 5. Success
