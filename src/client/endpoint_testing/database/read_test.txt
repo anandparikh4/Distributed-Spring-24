@@ -59,7 +59,40 @@ Response Json =
     "status": "failure"
 }
 
-5. Success
+5. The range of student ids provided is not in any shard
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+
+Payload Json = 
+{
+    "stud_id": {"low": 5056, "high": 6729}
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: No data entries found",
+    "status": "failure"
+}
+
+6. Success
 
 Prerequisite = Default configuration via POST at /init.
                Run init-db.py to enter values into the distributed database.
