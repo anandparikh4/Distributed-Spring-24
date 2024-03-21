@@ -43,12 +43,15 @@ async def delete():
     # END del_put_wrapper
 
     try:
-        # Get the request payload
-        payload = dict(await request.get_json())
-        ic(payload)
+         # Convert the reponse to json object
+        response_json = await request.get_json()
 
-        if payload is None:
+        if response_json is None:
             raise Exception('Payload is empty')
+
+        # Convert the json response to dictionary
+        payload = dict(response_json)
+        ic(payload)
 
         # Get the required fields from the payload and check for errors
         stud_id = int(payload.get('stud_id', -1))
@@ -106,6 +109,7 @@ async def delete():
                     # END async with aiohttp.ClientSession
 
                     max_valid_at = shard_valid_at
+                    max_rows_deleted = 0
                     # If all replicas are not updated, then return an error
                     for r in serv_response:
                         if r is None or r.status != 200:
@@ -114,6 +118,7 @@ async def delete():
                         resp = dict(await r.json())
                         cur_valid_at = int(resp["valid_at"])
                         max_valid_at = max(max_valid_at, cur_valid_at)
+                        max_rows_deleted = max(max_rows_deleted, int(resp["rows_updated"]))
                     # END for r in serv_response
 
                     await conn.execute(
@@ -133,10 +138,16 @@ async def delete():
         # END async with common.lock(Read)
 
         # Return the response payload
-        return jsonify(ic({
-            'message': f"Data entry with stud_id: {stud_id} removed from all replicas",
-            'status': 'success'
-        })), 200
+        if max_rows_deleted == 0:
+            return jsonify(ic({
+                'message': f"Data entry with stud_id: {stud_id} does not exist",
+                'status': 'success'
+            })), 200
+        else:
+            return jsonify(ic({
+                'message': f"Data entry with stud_id: {stud_id} removed from all replicas",
+                'status': 'success'
+            })), 200
 
     except Exception as e:
 

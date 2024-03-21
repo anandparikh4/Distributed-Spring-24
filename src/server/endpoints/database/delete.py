@@ -51,13 +51,19 @@ async def delete():
                 await rules(shard_id, valid_at)
 
                 # Update the deleted_at field
-                await conn.execute('''--sql
+                update_res = await conn.execute('''--sql
                     UPDATE StudT
                     SET deleted_at = $1::INTEGER
                     WHERE stud_id = $2::INTEGER 
                         AND shard_id = $3::TEXT
                         AND created_at <= $4::INTEGER;
                 ''', term, stud_id, shard_id, valid_at)
+
+                ic(update_res)
+
+                rows_updated = int(update_res.split(' ')[-1])
+
+                ic(rows_updated)
 
                 # Save the term in the TermT table
                 await conn.execute('''--sql
@@ -67,11 +73,21 @@ async def delete():
                 ''', term, shard_id)
 
         # Send the response
-        response_payload = {
-            "message": f'Data entry with Stud_id:{stud_id} removed',
-            "status": "success",
-            "valid_at": term
-        }
+        if rows_updated == 0:
+            response_payload = {
+                "message": f"Data entry with Stud_id:{stud_id} does not exist",
+                "rows_updated": rows_updated,
+                "status": "success",
+                "valid_at": term
+            }
+
+        else: 
+            response_payload = {
+                "message": f'Data entry with Stud_id:{stud_id} removed',
+                "rows_updated": rows_updated,
+                "status": "success",
+                "valid_at": term
+            }
 
         return jsonify(ic(response_payload)), 200
 

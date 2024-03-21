@@ -5,7 +5,7 @@ from utils import *
 blueprint = Blueprint('update', __name__)
 
 
-@blueprint.route('/update', methods=['PUT'])
+@blueprint.route('/update', methods=['POST'])
 async def update():
     """
     Update a particular data entry in the distributed database.
@@ -40,7 +40,7 @@ async def update():
         # To allow other tasks to run
         await asyncio.sleep(0)
 
-        async with session.put(f'http://{server_name}:5000/update',
+        async with session.post(f'http://{server_name}:5000/update',
                                json=json_payload) as response:
             await response.read()
 
@@ -48,12 +48,15 @@ async def update():
     # END update_put_wrapper
 
     try:
-        # Get the request payload
-        payload = dict(await request.get_json())
-        ic(payload)
+        # Convert the reponse to json object
+        response_json = await request.get_json()
 
-        if payload is None:
+        if response_json is None:
             raise Exception('Payload is empty')
+
+        # Convert the json response to dictionary
+        payload = dict(response_json)
+        ic(payload)
 
         # Get the required fields from the payload and check for errors
         stud_id = int(payload.get('stud_id', -1))

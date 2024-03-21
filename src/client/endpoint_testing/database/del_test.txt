@@ -1,0 +1,47 @@
+DELETE /del
+
+1. Empty Payload
+
+Payload Json = EMPTY
+
+Response Json =
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. Payload does not contain `stud_id` field
+
+Payload Json = {}
+
+Response Json =
+{
+    "message": "<Error> Exception: Payload does not contain `stud_id` field",
+    "status": "failure"
+}
+
+3. `stud_id` does not exist
+
+Prerequisite = Default configuration via POST at /init
+               POST /write with paylod: 
+               {
+                    "data": [
+                        {
+                            "stud_id": 0,
+                            "stud_name": "Booker Dewitt",
+                            "stud_marks": 87
+                        },
+                        {
+                            "stud_id": 1,
+                            "stud_name": "Max Payne",
+                            "stud_marks": 96
+                        }
+                    ]
+                }
+
+Payload Json = 
+{
+    "stud_id": 2
+}
+
+            

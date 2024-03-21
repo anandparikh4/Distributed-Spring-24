@@ -50,12 +50,15 @@ async def read():
     # END read_get_wrapper
 
     try:
-        # Get the request payload
-        payload = dict(await request.get_json())
-        ic(payload)
+        # Convert the reponse to json object
+        response_json = await request.get_json()
 
-        if payload is None:
+        if response_json is None:
             raise Exception('Payload is empty')
+
+        # Convert the json response to dictionary
+        payload = dict(response_json)
+        ic(payload)
 
         # Get the required fields from the payload
         stud_id = dict(payload.get('stud_id', {}))
