@@ -1,0 +1,71 @@
+POST /update
+
+1. Empty Payload
+
+Payload Json = EMPTY
+
+Response Json =
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. Payload does not contain `stud_id` field
+
+Payload Json = {}
+
+Response Json =
+{
+    "message": "<Error> Exception: Payload does not contain `stud_id` field",
+    "status": "failure"
+}
+
+3. Payload does not contain `data` field
+
+Payload Json = 
+{
+    "stud_id": 0
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Payload does not contain `data` field",
+    "status": "failure"
+}
+
+4. Data entry is invalid
+
+Payload Json = 
+{
+    "stud_id": 0,
+    "data": {
+        "stud_id": 0,
+        "stud_name": "Booker Dewitt"
+    }
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Data entry is invalid",
+    "status": "failure"
+}
+
+5. Success
+
+Prerequisite = Default configuration via POST at /init
+
+Payload Json = 
+{
+    "stud_id": 0,
+    "data": {
+        "stud_id": 0,
+        "stud_name": "Booker Dewitt",
+        "stud_marks": 94
+    }
+}
+
+Response Json =
+{
+    "message": "Data entry for stud_id: 0 updated",
+    "status": "success"
+}
