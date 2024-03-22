@@ -13,8 +13,8 @@ async def read():
     ranges: List[Tuple[int, int]] = []
 
     # Generate ranges
-    N = 10000
-    MAX = 10000
+    N = 3
+    MAX = 10
 
     for _ in range(N):
         low = random.randint(0, MAX)
@@ -42,7 +42,6 @@ async def read():
             }
         }
         tasks.append(asyncio.create_task(wrapper(payload)))
-        # await wrapper(payload)
 
     await asyncio.gather(*tasks)
 
