@@ -6,7 +6,8 @@ async def handle_flatline(
     docker_semaphore: asyncio.Semaphore,
     docker: Docker,
     serv_id: int,
-    hostname: str
+    hostname: str,
+    servers_flatlined: List[str]
 ):
     """
     Handles the flatline of a server replica.
@@ -69,6 +70,7 @@ async def handle_flatline(
             hostname,
             shards,
             req_semaphore,
+            servers_flatlined
         )
     )
 
@@ -115,7 +117,8 @@ async def get_heartbeats():
         semaphore: asyncio.Semaphore,
         docker: Docker,
         serv_id: int,
-        hostname: str
+        hostname: str,
+        servers_flatlined: List[str]
     ):
         # To allow other tasks to run
         await asyncio.sleep(0)
@@ -126,7 +129,8 @@ async def get_heartbeats():
                     docker_semaphore=semaphore,
                     docker=docker,
                     serv_id=serv_id,
-                    hostname=hostname
+                    hostname=hostname,
+                    servers_flatlined=servers_flatlined
                 )
             except Exception as e:
                 if DEBUG:
@@ -200,6 +204,8 @@ async def get_heartbeats():
                 if len(flatlines) > 0:
                     docker_semaphore = asyncio.Semaphore(
                         DOCKER_TASK_BATCH_SIZE)
+                    
+                    servers_flatlined = [name for name, _ in flatlines]
 
                     async with Docker() as docker:
                         tasks = [asyncio.create_task(
@@ -207,7 +213,8 @@ async def get_heartbeats():
                                 semaphore=docker_semaphore,
                                 docker=docker,
                                 serv_id=serv_id,
-                                hostname=serv_name
+                                hostname=serv_name,
+                                servers_flatlined=servers_flatlined
                             )
                         ) for serv_name, serv_id in flatlines]
 

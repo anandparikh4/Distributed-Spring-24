@@ -52,7 +52,8 @@ async def spawn_container(
 async def copy_shards_to_container(
     hostname: str,
     shards: List[str],
-    semaphore: asyncio.Semaphore
+    semaphore: asyncio.Semaphore,
+    servers_flatlined: List[str]=None
 ):
     """
     1. Call /config endpoint on the server S with the hostname
@@ -66,6 +67,9 @@ async def copy_shards_to_container(
         - shards: list of shard names to copy
         - semaphore: asyncio.Semaphore
     """
+
+    if servers_flatlined is None:
+        servers_flatlined = []
 
     global shard_map
 
@@ -157,7 +161,10 @@ async def copy_shards_to_container(
 
                 # Get server A from `shard_map` for the shard K
                 # TODO: Chage to ConsistentHashMap
+
                 server = shard_map[shard].find(get_request_id())
+                while server in servers_flatlined:
+                    server = shard_map[shard].find(get_request_id())
 
                 shard_valid_at: int = await stmt.fetchval(shard)
 

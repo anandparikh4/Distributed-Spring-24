@@ -54,9 +54,6 @@ Both threading and asyncio libraries in Python support concurrent programming. H
 1. Due to the Global Interpreter Lock, only one thread can execute Python code at once. This means that for most Python 3 implementations, the different threads do not actually execute at the same time, they merely appear to.
 1. Threads are used to perform preemptive multi-tasking where the scheduler decides which threads to run and when. On the other hand, asyncio model allows cooperative multi-tasking where the user decides which tasks to run and when.
 
-### Random Hostnames
-When a GET request is made to the /add endpoint of the load balancer, the payload requires the number of servers `N` and list of hostnames `replicas`. If `N` > `len(replicas)`, `N - len(replicas)` servers are to be added having random hostnames. A random hostname has the format `Server-XXX-YYY` where XXX is a three-digit random number and YYY is a three-digit timestamp based on the current time in milliseconds. The chances of two randomly generated hostnames having the same hostname, in practice, is quite low. Even then, this case is handled by using a set so that no two generated hostnames are the same.
-
 ### Cooperative Multitasking
 The application runs several taks asynchronously. These are:
 1. `spawn_container`: This task is used to spawn the server containers. The load balancer maintains a total of `N` servers at a time. If some server goes down, the load balancer detects it and spawns a new server.
@@ -92,7 +89,7 @@ For every shard, both the servers and the load balancer maintains a notion of ti
 The general operation can therefore be written as `O(shard_id, stud_id, vat)` where `O` can be `C`, `R`, `U` or `D`. In the description of the algorithm, lines starting with `LB` denotes that it is executed by the load balancer whereas those starting with `S` denotes that they are executed by the server. The `return` statement is essentially the statement `send response to client`. The actual requests and responses may contain additional payloads not relevant to the Cat-Dat-Vat algorithm. These payloads are therefore not mentioned in the description of the algorithm. In load balancer or servers, any set of database accesses are all performed within a single transaction, such that when failures occur, the changes are all rolled back and consistency is ensured. Locking of database rows is employed by `postgres`'s `SELECT ... FOR UPDATE` syntax.
 
 #### The Algorithm
-```shell
+```text
 Algorithm Cat-Dat-Vat(O, shard_id, stud_id, vat):
     LB  |    
     LB  |    servers <-- list of servers for the load balancer to send requests to
@@ -131,7 +128,8 @@ Algorithm Cat-Dat-Vat(O, shard_id, stud_id, vat):
     S   |                
     S   |                send response to load balaner
     LB  |                
-    S   |            else:
+    S   |            else if O == U:
+    S   |                # `U` operation is essentially a `D` operation followed by a `C` operation 
     S   |                update dat to term corresponding to stud_id
     S   |                term += 1
     S   |                insert data with cat = term and dat = ∞
