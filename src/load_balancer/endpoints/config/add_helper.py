@@ -163,8 +163,9 @@ async def copy_shards_to_container(
                 # TODO: Chage to ConsistentHashMap
 
                 server = shard_map[shard].find(get_request_id())
-                while server in servers_flatlined:
-                    server = shard_map[shard].find(get_request_id())
+                if len(servers_flatlined) > 0:
+                    while server in servers_flatlined:
+                        server = shard_map[shard].find(get_request_id())
 
                 shard_valid_at: int = await stmt.fetchval(shard)
 
