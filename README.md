@@ -24,6 +24,29 @@ make stop
 
 ## Analysis
 
+For A1-A3, the read times and write times are checked on two different machines. The payloads can be found inside [read_write_testing](./src/client/read_write_testing).
+
+### A1
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 366.13           | 548.40            |
+| Machine 2 | 196.46           | 576.48            |
+
+### A2
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 368.24           | 1107.88            |
+| Machine 2 | 200.48           | 1140.94            |
+
+### A3
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 373.65           | 1021.17            |
+| Machine 2 | 188.34           | 1124.97            |
+
+### A4
+The prerequisites and sample request-reponse pairs for the endpoints can be found inside [endpoint_testing](./src/client/endpoint_testing).
+
 ## Data Generation
 In the `./src/client/data` directory, there are two files [fnames.txt](./src/client/data/fnames.txt) and [lnames.txt](./src/client/data/lnames.txt). `fnames.txt` contains `942` unique first names and `lnames.txt` contains `995` unique last names. Using these names, [generate.py](./src/client/generate.py) creates `942 * 995 = 937290` data entries with marks generated unformly at random in the range from `1` to `100`. 
 
