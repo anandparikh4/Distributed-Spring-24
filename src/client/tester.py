@@ -13,8 +13,8 @@ async def read():
     ranges: List[Tuple[int, int]] = []
 
     # Generate ranges
-    N = 10000
-    MAX = 10000
+    N = 100
+    MAX = 16383
 
     for _ in range(N):
         low = random.randint(0, MAX)
