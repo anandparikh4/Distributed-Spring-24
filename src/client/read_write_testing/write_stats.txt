@@ -1,8 +1,10 @@
-$ python3 write_req.py 
-Time taken: 548.40 seconds
+Machine 1
 
-$ python3 write_req.py 
-Time taken: 1107.88 seconds
+A1 - Time taken: 548.40 seconds
+A2 - Time taken: 1107.88 seconds
+A3 - Time taken: 1021.17 seconds
 
-$ python3 write_req.py 
-Time taken: 1021.17 seconds
+Machine 2
+A1 - Time taken: 548.40 seconds
+A2 - Time taken: 1107.88 seconds
+A3 - Time taken: 1021.17 seconds

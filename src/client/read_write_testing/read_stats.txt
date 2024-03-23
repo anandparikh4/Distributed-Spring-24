@@ -1,8 +1,11 @@
-$ python3 read_req.py 
-Time taken: 366.13 seconds
+Machine 1
 
-$ python3 read_req.py 
-Time taken: 368.24 seconds
+A1 - Time taken: 366.13 seconds
+A2 - Time taken: 368.24 seconds
+A3 - Time taken: 373.65 seconds
 
-$ python3 read_req.py 
-Time taken: 373.65 seconds
+Machine 2
+
+A1 - Time taken: 366.13 seconds
+A2 - Time taken: 368.24 seconds
+A3 - Time taken: 373.65 seconds
