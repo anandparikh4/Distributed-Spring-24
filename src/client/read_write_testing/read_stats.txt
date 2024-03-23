@@ -1,0 +1,8 @@
+$ python3 read_req.py 
+Time taken: 366.13 seconds
+
+$ python3 read_req.py 
+Time taken: 368.24 seconds
+
+$ python3 read_req.py 
+Time taken: 373.65 seconds

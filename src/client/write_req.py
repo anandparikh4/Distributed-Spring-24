@@ -6,7 +6,7 @@ import random
 import time
 from pprint import pp
 
-N = 10
+N = 10000
 url = 'http://localhost:5000/write'
 
 async def main():
@@ -29,7 +29,7 @@ async def main():
         'stud_marks': int(row[2])
     } for row in data]
 
-    BATCH = 1000
+    BATCH = 100
     semaphore = asyncio.Semaphore(BATCH)
 
     async def wrapper(payload: dict):

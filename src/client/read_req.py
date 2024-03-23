@@ -13,8 +13,8 @@ async def read():
     ranges: List[Tuple[int, int]] = []
 
     # Generate ranges
-    N = 3
-    MAX = 10
+    N = 10000
+    MAX = 10000
 
     for _ in range(N):
         low = random.randint(0, MAX)
@@ -24,7 +24,7 @@ async def read():
 
     # pp(ranges)
 
-    BATCH = 1000
+    BATCH = 100
     semaphore = asyncio.Semaphore(BATCH)
 
     async def wrapper(payload: dict):
