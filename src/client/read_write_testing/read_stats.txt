@@ -6,6 +6,6 @@ A3 - Time taken: 373.65 seconds
 
 Machine 2
 
-A1 - Time taken: 366.13 seconds
-A2 - Time taken: 368.24 seconds
-A3 - Time taken: 373.65 seconds
+A1 - Time taken: 196.46 seconds
+A2 - Time taken: 200.48 seconds
+A3 - Time taken: 188.34 seconds
