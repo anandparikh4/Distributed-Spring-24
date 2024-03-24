@@ -53,7 +53,7 @@ async def copy_shards_to_container(
     hostname: str,
     shards: List[str],
     semaphore: asyncio.Semaphore,
-    servers_flatlined: List[str]=None
+    servers_flatlined: Optional[List[str]]=None
 ):
     """
     1. Call /config endpoint on the server S with the hostname
