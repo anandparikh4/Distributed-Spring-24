@@ -7,7 +7,11 @@ import time
 from pprint import pp
 
 N = 10000
+len_data = 4096*4
+doubles = len_data - N
+singles = N - doubles
 url = 'http://localhost:5000/write'
+
 
 async def main():
 
@@ -18,7 +22,7 @@ async def main():
         for row in csv.reader(file):
             data.append(row)
             i += 1
-            if i == N:
+            if i == len_data:
                 break
 
     random.shuffle(data)
@@ -39,8 +43,19 @@ async def main():
                     await resp.read()
 
     tasks = []
-    for item in data:
-        tasks.append(asyncio.create_task(wrapper({"data": [item]})))
+    cnt = 0
+    i = 0
+    while i < len_data:
+        if cnt < doubles:
+            tasks.append(asyncio.create_task(
+                wrapper({"data": [data[i], data[i+1]]})))
+            i += 2
+            cnt += 1
+        else:
+            tasks.append(asyncio.create_task(wrapper({"data": [data[i]]})))
+            i += 1
+
+    print(f"Total requests: {len(tasks)}")
 
     await asyncio.gather(*tasks)
 

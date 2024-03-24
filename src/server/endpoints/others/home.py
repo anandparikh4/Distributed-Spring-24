@@ -16,6 +16,6 @@ async def home():
     """
 
     return jsonify(ic({
-        'message': f"Hello from Server: {SERVER_ID}",
+        'message': f"Hello from {HOSTNAME}: {SERVER_ID}",
         'status': "successful"
     })), 200

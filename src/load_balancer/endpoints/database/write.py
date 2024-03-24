@@ -68,7 +68,7 @@ async def write():
         # END for entry in data
 
         # Get the shard names and valid ats and the corresponding entries to be added
-        # [shard_at] -> (list of entries, valid_at)
+        # [shard_id] -> (list of entries, valid_at)
         shard_data: Dict[str, Tuple[List[Dict[str, Any]], int]] = {}
 
         async with common.lock(Read):
@@ -88,12 +88,11 @@ async def write():
                     get_valid_at_stmt = await conn.prepare(
                         '''--sql
                         SELECT
-                            shard_id,
                             valid_at
                         FROM
                             ShardT
                         WHERE
-                            shard_id = ANY($1::TEXT[])
+                            shard_id = $1::TEXT
                         FOR UPDATE;
                         ''')
 
@@ -123,9 +122,11 @@ async def write():
                         shard_data[shard_id][0].append(entry)
                     # END for entry in data
 
-                    async for row in get_valid_at_stmt.cursor(list(shard_data.keys())):
-                        shard_data[row["shard_id"]] = (shard_data[row["shard_id"]][0],
-                                                       row["valid_at"])
+                    # To prevent deadlocks in the database, sort the shard_ids
+                    for shard_id in sorted(shard_data.keys()):
+                        shard_valid_at: int = await get_valid_at_stmt.fetchval(shard_id)
+                        shard_data[shard_id] = (shard_data[shard_id][0],
+                                                shard_valid_at)
 
                     for shard_id in shard_data:
                         # TODO: Chage to ConsistentHashMap

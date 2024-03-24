@@ -19,12 +19,14 @@ async def main():
     with open('data/people.csv', 'r') as file:
         reader = csv.DictReader(file)
         data = list(reader)
+    
+    len_data = 4096*4
 
     data = [{
         'stud_id': int(row['id']),
         'stud_name': row['name'],
         'stud_marks': int(row['marks'])
-    } for row in data]
+    } for row in data[:len_data]]
 
     await write_db({"data": data})
 
