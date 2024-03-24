@@ -1,72 +1,58 @@
 import asyncio
-import sys
 from pprint import pp
-from time import time
-
+import time
+from typing import List, Tuple
+import random
 import aiohttp
-from matplotlib import pyplot as plt
 
 # URL of the server
-url = 'http://127.0.0.1:5000'
+url = 'http://127.0.0.1:5000/read'
 
 
-async def gather_with_concurrency(
-    session: aiohttp.ClientSession,
-    batch: int,
-    *urls: str
-):
-    """
-    Gather with concurrency from aiohttp async session
-    """
+async def read():
+    ranges: List[Tuple[int, int]] = []
 
-    semaphore = asyncio.Semaphore(batch)
+    # Generate ranges
+    N = 100
+    MAX = 16383
 
-    async def fetch(url: str):
+    for _ in range(N):
+        low = random.randint(0, MAX)
+        high = random.randint(low, MAX)
+
+        ranges.append((low, high))
+
+    # pp(ranges)
+
+    BATCH = 1000
+    semaphore = asyncio.Semaphore(BATCH)
+
+    async def wrapper(payload: dict):
         async with semaphore:
-            async with session.get(url) as response:
-                await response.read()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, json=payload) as resp:
+                    await resp.read()
 
-            await asyncio.sleep(0)
+    tasks = []
+    for r in ranges:
+        payload = {
+            "stud_id": {
+                "low": r[0],
+                "high": r[1]
+            }
+        }
+        tasks.append(asyncio.create_task(wrapper(payload)))
+        # await wrapper(payload)
 
-            return response
-    # END fetch
-
-    tasks = [fetch(url) for url in urls]
-
-    return [None if isinstance(r, BaseException)
-            else r for r in
-            await asyncio.gather(*tasks, return_exceptions=True)]
-
-
-async def main(server_count:int = 3):
-    async with aiohttp.ClientSession() as session:
-        responses = await gather_with_concurrency(
-            session, 1000, *[f'{url}/home' for _ in range(10_000)])
-
-    N = server_count
-    counts = {k: 0 for k in range(N+1)}
-
-    # for _, response in grequests.imap_enumerated(requests):
-    for response in responses:
-        if response is None or not response.status == 200:
-            counts[0] += 1
-            continue
-
-        payload: dict = await response.json()
-        msg = payload.get('message', '')
-        server_id = int(msg.split(':')[-1].strip())
-        counts[server_id] += 1
-
-    pp(counts)
-    pp(sum(counts.values()))
-    plt.bar(list(counts.keys()), list(counts.values()))
-    plt.savefig(f'../../plots/plot-{N}-{int(time()*1e3)}.jpg')
-    # plt.show()
+    await asyncio.gather(*tasks)
 
 
 # END main
 
+
 if __name__ == '__main__':
-    num = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    
-    asyncio.run(main(num))
+    start = time.perf_counter()
+    asyncio.run(read())
+    end = time.perf_counter()
+
+    print(f"Time taken: {end-start:.2f} seconds")

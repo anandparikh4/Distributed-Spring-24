@@ -1,4 +1,4 @@
-# Distributed-Assignment-1
+# Distributed-Assignment-2
 
 ## Members
 * Utsav Basu - 20CS30057
@@ -7,7 +7,12 @@
 * Anand Manojkumar Parikh - 20CS10007
 
 ## How to run
-We have supplied a [Makefile](./src/Makefile) in the `./src` directory.
+Before starting, permissions for `docker.sock` have to be updated.
+```shell
+sudo chmod 777 <location of docker.sock> # usually the location is /var/run/docker.sock
+```
+
+There is a [Makefile](./src/Makefile) in the `./src` directory.
 To start everything:
 ```shell
 make
@@ -17,98 +22,33 @@ To stop everything:
 make stop
 ```
 
-## Testing 
-Two python files can be used for testing the application. These are as follows:
-1. `client.py`: It is a commandline interface to send requests to the load balancer end points.
-    * `/rep`: `rep`
-    * `/home`: `home`
-    * `/add`: `add <count:int> [<name:string>] ...` (eg. add 5 hello \<space> world)
-    * `/rm`: `del <count:int> [<name:string>] ...` (eg. del 5 hello \<space> world)
-    * `/<path:path>`: `<path>` (eg. hello/world)
-
-    Run it using:
-    ``` shell
-    python client.py
-    ```
-
-1. `tester.py`: It sends 10000 requests to the load balancer and saves the bar chart plot of the number of requests sent to each server in folder `./plots`.
-    Run it using:
-    ``` shell
-    python tester.py <num:int> # num: the number of server replicas
-    ```
-
 ## Analysis
-### A-1
-The load balancer is tested for 10000 requests with N = 3 servers. The distribution of requests among the 3 servers is shown by the following bar charts. These are generated using `tester.py`.
 
-#### With Given Hash Function:
-![](./plots/plot-3-0.jpg)
+For A1-A3, the read times and write times are checked on two different machines. The payloads can be found inside [read_write_testing](./src/client/read_write_testing).
 
-#### With Modified Hash Function:
-![](./plots/plot-3-1.jpg)
+### A1
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 366.13           | 548.40            |
+| Machine 2 | 196.46           | 576.48            |
 
-#### With Cryptographic Hash Function:
-![](./plots/plot-3-2.jpg)
+### A2
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 368.24           | 1107.88            |
+| Machine 2 | 200.48           | 1140.94            |
 
-### A-2
-The load balancer is tested for 10000 requests with 2, 3, 4, 5 and 6 server replicas. The line charts below plot the standard deviation of the number of requests sent to each server.
+### A3
+|           | Read Time (in s) | Write Time (in s) |
+|-----------|------------------|-------------------|
+| Machine 1 | 373.65           | 1021.17            |
+| Machine 2 | 188.34           | 1124.97            |
 
-#### With Given Hash Function:
-![](./plots/SD-0.jpg)
+### A4
+The prerequisites and sample request-reponse pairs for the endpoints can be found inside [endpoint_testing](./src/client/endpoint_testing).
 
-#### With Modified Hash Function:
-![](./plots/SD-1.jpg)
-
-#### With Cryptographic Hash Function:
-![](./plots/SD-2.jpg)
-
-### A-3
-The load balancer is tested for all the endpoints and the corresponding logs of both the server side and the client side are given below. This testing is done using `client.py`.
-* `rep`
-    * [Client-side](./plots/rep-req.png) 
-    * [Server-side](./plots/rep-res.png)
-
-* `add` normal
-    * [Client-side](./plots/add-req.png) 
-    * [Server-side](./plots/add-res.png)
-
-* `add` faulty
-    * [Client-side](./plots/add-faulty-req.png) 
-    * [Server-side](./plots/add-faulty-res.png)
-
-* `del` normal
-    * [Client-side](./plots/del-req.png) 
-    * [Server-side](./plots/del-res.png)
-
-* `del` faulty
-    * [Client-side](./plots/del-faulty-req.png) 
-    * [Server-side](./plots/del-faulty-res.png)
-
-* `home` 
-    * [Client-side](./plots/home-req.png) 
-    * [Server-side](./plots/home-res.png)
-
-* `other`
-    * [Client-side](./plots/oth-req.png) 
-    * [Server-side](./plots/oth-res.png)
-
-### A-4
-Three pairs of hash functions have been used and can be found in `./src/load-balancer/hash/hash_functions.py`.
-
-#### Given Hash Function
->$H(i) = i^2 + 2i + 17$
-
->$\phi(i, j) = i^2 + j^2 + 2j + 25$
-
-#### Modified Hash Function
-The coefficients are large and prime to cover the whole slot-space nearly uniformly with larger distance between virtual copies and so that taking modulo by any slot size does not reduce randomness.
-
->$H(i) = 1427i^2 + 2503i + 2003$
-
->$\phi(i, j) = 1249i^2 + 2287j^2 + 1663j + 2287$
-
-#### Cyrptographic Hash Function
-SHA-256 has been used for both $H$ and $\phi$
+## Data Generation
+In the `./src/client/data` directory, there are two files [fnames.txt](./src/client/data/fnames.txt) and [lnames.txt](./src/client/data/lnames.txt). `fnames.txt` contains `942` unique first names and `lnames.txt` contains `995` unique last names. Using these names, [generate.py](./src/client/generate.py) creates `942 * 995 = 937290` data entries with marks generated unformly at random in the range from `1` to `100`. 
 
 ## Main Libraries Used
 ### [Quart](https://pgjones.gitlab.io/quart/)
@@ -124,7 +64,10 @@ The aiohttp library is used for bulilding asynchronous HTTP client/server for as
 The aiodocker library is a simple docker HTTP API wrapper written with asyncio and aiohttp. Rather than making system calls inside the load balancer to perform docker related tasking like adding or removing server containers, aiodocker exposes functions with loads of flexibilities to perform these tasks.
 
 ### [fifolock](https://github.com/michalc/fifolock)
-This library is used for controlling concurrent read/writes to two important data structures used in the application. One of these data structures is used for mapping requests to virtual servers by consistent hasing. The other maintains the count of failed heartbeats for the servers.  
+This library is used for controlling concurrent read/writes to two important data structures used in the application. One of these data structures is used for mapping requests to virtual servers by consistent hasing. The other maintains the count of failed heartbeats for the servers.
+
+### [asyncpg](https://magicstack.github.io/asyncpg/current/)
+Asyncpg is a high-performance, asynchronous PostgreSQL database client library for Python. It is designed to provide efficient and low-latency communication with a PostgreSQL database by leveraging the power of Python's asyncio framework.
 
 ## Design Choices
 Different design choices have been made throughout the application, keeping in mind efficiency, functionality and understandability. Some of these are given below:
@@ -133,9 +76,6 @@ Different design choices have been made throughout the application, keeping in m
 Both threading and asyncio libraries in Python support concurrent programming. However, choice was made to use the asyncio library due to the following reasons:
 1. Due to the Global Interpreter Lock, only one thread can execute Python code at once. This means that for most Python 3 implementations, the different threads do not actually execute at the same time, they merely appear to.
 1. Threads are used to perform preemptive multi-tasking where the scheduler decides which threads to run and when. On the other hand, asyncio model allows cooperative multi-tasking where the user decides which tasks to run and when.
-
-### Random Hostnames
-When a GET request is made to the /add endpoint of the load balancer, the payload requires the number of servers `N` and list of hostnames `replicas`. If `N` > `len(replicas)`, `N - len(replicas)` servers are to be added having random hostnames. A random hostname has the format `Server-XXX-YYY` where XXX is a three-digit random number and YYY is a three-digit timestamp based on the current time in milliseconds. The chances of two randomly generated hostnames having the same hostname, in practice, is quite low. Even then, this case is handled by using a set so that no two generated hostnames are the same.
 
 ### Cooperative Multitasking
 The application runs several taks asynchronously. These are:
@@ -150,3 +90,82 @@ A cooperation takes place whenever there are multiple tasks to perform simultane
 Some design choices have been made during dockerizing the application. These are as follows:
 1. The default python image is based on the Ubuntu image which installs some unnecessary packages not needed for our application. Instead, the python image based on the Alpine image is used. This image is much lighter than the earlier one.
 1. Multistage build have been used during dockerization. This is done to reduce the image sizes for the load balancer and the server as much as possible.
+1. Both the load balancer and server containers are deployed via a shell script `deploy.sh`. `postgres` is first run as a background task and the main process waits until it starts, using a variable `pg_isready`. When `postgres` is up and running, the main process runs the actual python file as a background task - `load_balancer.py` for load balancer and `server.py` for servers. Signal handlers are modified such that any `SIGTERM` or `SIGINT` signal to the main process is sent to the two child processes as well. The main process then waits for the two child processes.  
+
+### The Cat-Dat-Vat Algorithm
+
+#### Preliminaries
+
+For ensuring distributed database consistency, the Cat-Dat-Vat algorithm is used. The name is derived from three different indices used to ensure consistency - `created_at` (`cat`), `deleted_at` (`dat`) and `valid_at` (`vat`). A server maintains two tables:
+1. `StudT(stud_id: INTEGER, stud_name: TEXT, stud_marks: INTEGER, shard_id: TEXT, created_at: INTEGER, deleted_at: INTEGER)`
+1. `TermT(shard_id: TEXT, term: INTEGER)`
+
+The load balancer maintains a single table:
+1. `ShardT(stud_id_low: INTEGER, shard_id: TEXT, shard_size: INTEGER, valid_at: INTEGER)`
+
+For every shard, both the servers and the load balancer maintains a notion of time - `term` for servers and `valid_at` for the load balancer. Instead of running a distributed leader election algorithm, the load balancer is regarded as the leader and its `valid_at` value for a shard is assumed to be always correct. When a shard is created for the first time, it does not contain any rows and these values (`term`s and `valid_at`) are initialized with `0`. Inside a shard, a row maintains `created_at` which denotes when the row was created and `deleted_at` which denotes when it was or is to be deleted. The operations sent by the load balancer to the servers is either of or can be broken down into the following types of elementary operations:
+1. Create: `C(shard_id, stud_id, vat)`
+2. Read: `R(shard_id, stud_id, vat)`
+3. Update: `U(shard_id, stud_id, vat)`
+4. Delete: `D(shard_id, stud_id, vat)`
+
+The general operation can therefore be written as `O(shard_id, stud_id, vat)` where `O` can be `C`, `R`, `U` or `D`. In the description of the algorithm, lines starting with `LB` denotes that it is executed by the load balancer whereas those starting with `S` denotes that they are executed by the server. The `return` statement is essentially the statement `send response to client`. The actual requests and responses may contain additional payloads not relevant to the Cat-Dat-Vat algorithm. These payloads are therefore not mentioned in the description of the algorithm. In load balancer or servers, any set of database accesses are all performed within a single transaction, such that when failures occur, the changes are all rolled back and consistency is ensured. Locking of database rows is employed by `postgres`'s `SELECT ... FOR UPDATE` syntax.
+
+#### The Algorithm
+```text
+Algorithm Cat-Dat-Vat(O, shard_id, stud_id, vat):
+    LB  |    
+    LB  |    servers <-- list of servers for the load balancer to send requests to
+    LB  |    max_vat <-- vat
+    LB  |    for server in servers:
+    S   |        delete entries where dat <= vat
+    S   |        delete entries where cat > vat
+    S   |        update dat to ∞ where dat > vat
+    S   |        if O == R:
+    S   |            response = {
+    S   |                "data": select entry corresponding to stud_id having cat <= vat
+    S   |            }
+    S   |            
+    S   |            send response to load balancer
+    LB  |            send response to client
+    LB  |            
+    S   |        else:
+    S   |            term <-- select term corresponding to shard_id
+    S   |            term <-- max(term, vat) + 1
+    S   |            
+    S   |            if O == C:
+    S   |                insert data with cat = term and dat = ∞
+    S   |                update term corresponding to shard_id
+    S   |                response = {
+    S   |                    "vat": term
+    S   |                }
+    S   |                
+    S   |                send response to load balancer        
+    LB  |                
+    S   |            else if O == D:
+    S   |                update dat to term corresponding to stud_id
+    S   |                update term corresponding to shard_id
+    S   |                response = {
+    S   |                    "vat": term
+    S   |                }
+    S   |                
+    S   |                send response to load balaner
+    LB  |                
+    S   |            else if O == U:
+    S   |                # `U` operation is essentially a `D` operation followed by a `C` operation 
+    S   |                update dat to term corresponding to stud_id
+    S   |                term += 1
+    S   |                insert data with cat = term and dat = ∞
+    S   |                update term corresponding to shard_id
+    S   |                response = {
+    S   |                    "vat": term
+    S   |                }
+    S   |                
+    S   |                send response to load balancer
+    LB  |                
+    LB  |            max_vat <-- max(max_vat, response["vat"])
+    LB  |
+    LB  |    update vat to max_vat corresponding to shard_id
+    LB  |
+    LB  |    send response to client
+```

@@ -1,49 +1,57 @@
-import os
-import sys
+from quart import Quart
 
-from icecream import ic
-from quart import Quart, Response, jsonify
+import common
+from common import *
+from endpoints import blueprint as endpoints_blueprint
 
 app = Quart(__name__)
 
-SERVER_ID = os.environ.get('SERVER_ID', '0')
-HOSTNAME = os.environ.get('HOSTNAME', 'localhost')
-DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
-ic.configureOutput(prefix=f'[{HOSTNAME}: {SERVER_ID}] | ')
+@app.before_serving
+async def my_startup():
+    '''
+        Run startup tasks
+    '''
 
-# Disable icecream debug messages if DEBUG is not set to true
-if not DEBUG:
-    ic.disable()
+    try:
+        # Register blueprints
+        app.register_blueprint(endpoints_blueprint)
+
+        # Connect to the database
+        common.pool = asyncpg.create_pool(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        await common.pool
+
+    except Exception as e:
+        print(f'{Fore.RED}ERROR | '
+              f'{e.__class__.__name__}: {e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        print(f'{Fore.RED}ERROR | '
+              f'Failed to start the server. Exiting...'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        # Exit the program
+        sys.exit(1)
 
 
-@app.route('/home', methods=['GET'])
-async def home():
-    """
-    Greet a client with its server ID.
+@app.after_serving
+async def my_shutdown():
+    '''
+        Run shutdown tasks
+    '''
 
-    Response payload:
-        message: Hello from Server: [ID]
-        status: status of the response
-    """
+    # Close the database connection
+    await common.pool.close()
 
-    return jsonify(ic({
-        'message': f"Hello from Server: {SERVER_ID}",
-        'status': "successful"
-    })), 200
-
-
-@app.route('/heartbeat', methods=['GET'])
-async def heartbeat():
-    """
-    Send heartbeat response upon request.
-
-    Response payload:
-        message: [EMPTY]
-        status: status of the response
-    """
-
-    return Response(status=200)
 
 if __name__ == '__main__':
     # Take port number from argument if provided

@@ -1,54 +1,29 @@
 version: "3.9"
-name: distributed_systems
+name: distributed_systems_2
 
-# define services
 services:
-
-  Server-1:
+  Dummy-Server:
     build: ./server
-    image: server:v1
-    container_name: Server-1
+    image: server:v2
+    container_name: Dummy-Server
     networks:
       my_net:
         aliases:
-          - Server-1
-    hostname: Server-1
+          - Dummy-Server
+    hostname: Dummy-Server
     tty: true
     environment:
-      SERVER_ID: 1
-      DEBUG: "true"
-
-  Server-2:
-    build: ./server
-    image: server:v1
-    container_name: Server-2
-    networks:
-      my_net:
-        aliases:
-          - Server-2
-    hostname: Server-2
-    tty: true
-    environment:
-      SERVER_ID: 2
-      DEBUG: "true"
-
-  Server-3:
-    build: ./server
-    image: server:v1
-    container_name: Server-3
-    networks:
-      my_net:
-        aliases:
-          - Server-3
-    hostname: Server-3
-    tty: true
-    environment:
-      SERVER_ID: 3
-      DEBUG: "true"
+      SERVER_ID: 0
+      # DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Load-Balancer:
     build: ./load_balancer
-    image: load:v1
+    image: load:v2
     container_name: Load-Balancer
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -63,7 +38,12 @@ services:
     tty: true
     environment:
       HASH_NUM: 1
-      DEBUG: "true"
+      # DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
 # define a network my_net
 networks:

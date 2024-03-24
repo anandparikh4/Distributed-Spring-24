@@ -161,3 +161,8 @@ cython_debug/
 
 # VS Code IDE configuration files
 .vscode/
+
+# temp folder/files
+temp/
+temp/*
+**/temp.*

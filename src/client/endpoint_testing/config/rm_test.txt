@@ -1,0 +1,200 @@
+DELETE /rm
+
+1. Empty Payload
+
+Payload Json = EMPTY
+
+Response Json = 
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. N <= 0
+
+Payload Json = 
+{
+    "N": 0
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Number of servers to delete must be greater than 0",
+    "status": "failure"
+}
+
+3. N > len(replicas)
+
+Payload Json = 
+{
+    "N": 1
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Number of servers to delete must be less than or equal to number of replicas",
+    "status": "failure"
+}
+
+4. len(hostnames) > N
+
+Prerequisite = Default configuration via POST at /init
+
+Payload Json =
+{
+    "N": 1,
+    "servers": ["Server0", "Server1"]
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Length of hostname list is more than instances to delete",
+    "status": "failure"
+}
+
+5. Server to be removed contains a shard which is not present on any other server
+
+Prerequisite = 
+POST /init with
+Payload Json = 
+{
+    "N": 2,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_id": "sh2",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ],
+        "Server1": [
+            "sh2"
+        ]
+    }
+}
+
+Payload Json = 
+{
+    "N": 2,
+    "servers": ["Server0", "Server1"]
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Only one copy of shards `['sh1', 'sh2']` is present in the hostnames `['Server0', 'Server1']` to delete, respectively.",
+    "status": "failure"
+}
+
+6. Some hostnames to be deleted are not present
+
+Prerequisite = 
+POST /init with
+Payload Json = 
+{
+    "N": 2,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_id": "sh2",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ],
+        "Server1": [
+            "sh2"
+        ]
+    }
+}
+
+Payload Json =
+{
+    "N": 1,
+    "servers": ["Server15"]
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Hostnames `{'Server15'}` are not in replicas",
+    "status": "failure"
+}
+
+7. N > Maximum number of servers that can be deleted
+
+Prerequisite = 
+POST /init with
+Payload Json = 
+{
+    "N": 2,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_id": "sh2",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ],
+        "Server1": [
+            "sh2"
+        ]
+    }
+}
+
+Payload Json = 
+{
+    "N": 2,
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Not enough replicas to delete. Only 0 replicas can be deleted.",
+    "status": "failure"
+}
+
+8. Success
+
+Prerequisite = Default configuration via POST at /init
+
+Payload Json =
+{
+    "N": 1,
+    "servers": ["Server1"]
+}
+
+Response Json = 
+{
+    "message": {
+        "N": 5,
+        "replicas": [
+            "Server0",
+            "Server3",
+            "Server4",
+            "Server5",
+            "Server6"
+        ]
+    },
+    "status": "success"
+}

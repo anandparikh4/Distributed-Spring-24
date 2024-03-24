@@ -1,0 +1,218 @@
+POST /read
+
+1. Empty Payload
+
+Payload Json = EMPTY
+
+Response Json = 
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. Payload does not contain `stud_id` field
+
+Payload Json = {}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Payload does not contain `stud_id` field",
+    "status": "failure"
+}
+
+3. `stud_id` does not contain `low` field
+
+Payload Json = 
+{
+    "stud_id": {"high": 250}
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: `stud_id` does not contain `low` field",
+    "status": "failure"
+}
+
+4. `stud_id` does not contain `high` field
+
+Payload Json =
+{
+    "stud_id": {"low": 250}
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: `stud_id` does not contain `high` field",
+    "status": "failure"
+}
+
+4. `low` cannot be greater than `high`
+
+Payload Json =
+{
+    "stud_id": {"low": 1024, "high": 50}
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: `low` cannot be greater than `high`",
+    "status": "failure"
+}
+
+5. The range of student ids provided is not in any shard
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ],
+                   }
+               }
+
+Payload Json = 
+{
+    "stud_id": {"low": 5056, "high": 6729}
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: No data entries found",
+    "status": "failure"
+}
+
+6. Success
+
+Prerequisite = Default configuration via POST at /init.
+               Run init-db.py to enter values into the distributed database.
+
+Payload Json = 
+{
+    "stud_id": {"low": 100, "high": 120}
+}
+
+Response Json = 
+{
+    "data": [
+        {
+            "stud_id": 100,
+            "stud_marks": 18,
+            "stud_name": "Alina Ferguson"
+        },
+        {
+            "stud_id": 101,
+            "stud_marks": 53,
+            "stud_name": "Giulia McIlheran"
+        },
+        {
+            "stud_id": 102,
+            "stud_marks": 5,
+            "stud_name": "Viva Terne"
+        },
+        {
+            "stud_id": 103,
+            "stud_marks": 36,
+            "stud_name": "Concordia Mathissen"
+        },
+        {
+            "stud_id": 104,
+            "stud_marks": 71,
+            "stud_name": "Sydel Kenafaque"
+        },
+        {
+            "stud_id": 105,
+            "stud_marks": 41,
+            "stud_name": "Alleen Kenderdine"
+        },
+        {
+            "stud_id": 106,
+            "stud_marks": 97,
+            "stud_name": "Weidar Saer"
+        },
+        {
+            "stud_id": 107,
+            "stud_marks": 77,
+            "stud_name": "Alexis Pook"
+        },
+        {
+            "stud_id": 108,
+            "stud_marks": 32,
+            "stud_name": "Virginia Matula"
+        },
+        {
+            "stud_id": 109,
+            "stud_marks": 80,
+            "stud_name": "Gal Divver"
+        },
+        {
+            "stud_id": 110,
+            "stud_marks": 7,
+            "stud_name": "Edgar Rabley"
+        },
+        {
+            "stud_id": 111,
+            "stud_marks": 57,
+            "stud_name": "Lauree Gianasi"
+        },
+        {
+            "stud_id": 112,
+            "stud_marks": 27,
+            "stud_name": "Katuscha Arrowsmith"
+        },
+        {
+            "stud_id": 113,
+            "stud_marks": 30,
+            "stud_name": "Myrta Hankins"
+        },
+        {
+            "stud_id": 114,
+            "stud_marks": 56,
+            "stud_name": "Jacqui Niche"
+        },
+        {
+            "stud_id": 115,
+            "stud_marks": 48,
+            "stud_name": "Bord Pulbrook"
+        },
+        {
+            "stud_id": 116,
+            "stud_marks": 13,
+            "stud_name": "Demetris Fifoot"
+        },
+        {
+            "stud_id": 117,
+            "stud_marks": 34,
+            "stud_name": "Byrom Atchly"
+        },
+        {
+            "stud_id": 118,
+            "stud_marks": 27,
+            "stud_name": "Marijn Rusted"
+        },
+        {
+            "stud_id": 119,
+            "stud_marks": 30,
+            "stud_name": "Kath Hilldrup"
+        },
+        {
+            "stud_id": 120,
+            "stud_marks": 54,
+            "stud_name": "William Schieferstein"
+        }
+    ],
+    "shards_queried": [
+        "sh1"
+    ],
+    "status": "success"
+}
