@@ -1,0 +1,41 @@
+GET /home
+
+1. No servers are up
+
+Payload Json = EMPTY
+
+Response Json = 
+{
+    "message": "<Error> RuntimeError: No servers alive",
+    "status": "failure"
+}
+
+2. Success
+
+Prerequisite = POST /init with payload
+               {
+                   "N": 2,
+                   "shards": [
+                       {
+                           "stud_id_low": 0,
+                           "shard_id": "sh1",
+                           "shard_size": 4096
+                       }
+                   ],
+                   "servers": {
+                       "Server0": [
+                           "sh1"
+                       ],
+                       "Server1": [
+                           "sh1"
+                       ]
+                   }
+               }
+
+Payload Json = EMPTY
+
+Response Json =
+{
+    "message": "Hello from Server: 126225",
+    "status": "successful"
+}
