@@ -7,6 +7,15 @@ blueprint = Blueprint('get_primary', __name__)
 
 @blueprint.route('/get_primary', methods=['GET'])
 async def get_primary():
+    """
+    `Request Payload`
+        `shard`: str
+        `request_id`: int
+
+    `Response Payload`
+        `shard`: str
+        `primary`: str
+    """
 
     await asyncio.sleep(0)
 

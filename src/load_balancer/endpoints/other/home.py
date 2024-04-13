@@ -29,10 +29,24 @@ async def home():
         request_id = get_request_id()
         ic(request_id)
 
-        server_name = replicas.find(request_id)
+        # server_name = replicas.find(request_id)
+
+        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(f'http://Shard-Manager:5000/get_server',
+                                   json={'request_id': request_id}) as response:
+                await response.read()
+
+        if response.status != 200:
+            raise Exception('No servers are available')
+
+        server_name = await response.json()
+        server_name = server_name.get('server_name')
 
         if server_name is None:
             raise Exception('No servers are available')
+
+        server_name = str(server_name)
 
         ic(server_name)
 

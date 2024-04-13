@@ -7,6 +7,16 @@ blueprint = Blueprint('get_server', __name__)
 
 @blueprint.route('/get_server', methods=['GET'])
 async def get_server():
+    """
+    `Request Payload`
+        `shard`: str
+        `request_id`: int
+
+    `Response Payload`
+        `shard`: str
+        `server`: str
+
+    """
 
     await asyncio.sleep(0)
 

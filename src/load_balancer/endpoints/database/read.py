@@ -1,3 +1,4 @@
+from http import server
 from quart import Blueprint, jsonify, request
 
 from utils import *
@@ -35,12 +36,21 @@ async def read():
 
     async def read_get_wrapper(
         session: aiohttp.ClientSession,
-        server_name: str,
+        request_id: int,
+        shard_id: str,
         json_payload: Dict
     ):
 
         # To allow other tasks to run
         await asyncio.sleep(0)
+
+        async with session.get(f'http://Shard-Manager:5000/get_server',
+                               json={'request_id': request_id,
+                                     'shard': shard_id}) as response:
+            await response.read()
+
+        server_name = await response.json()
+        server_name = server_name.get('server_name')
 
         async with session.get(f'http://{server_name}:5000/read',
                                json=json_payload) as response:
@@ -113,17 +123,18 @@ async def read():
                 timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
-                        if len(shard_map[shard_id]) == 0:
-                            continue
+                        # if len(shard_map[shard_id]) == 0:
+                        #     continue
 
-                        # TODO: Change to ConsistentHashMap
-                        server_name = shard_map[shard_id].find(
-                            get_request_id())
+                        # # TODO: Change to ConsistentHashMap
+                        # server_name = shard_map[shard_id].find(
+                        #     get_request_id())
 
                         tasks.append(asyncio.create_task(
                             read_get_wrapper(
                                 session=session,
-                                server_name=server_name,
+                                request_id=get_request_id(),
+                                shard_id=shard_id,
                                 json_payload={
                                     "shard": shard_id,
                                     "stud_id": stud_id,
@@ -135,13 +146,13 @@ async def read():
 
                     serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                     serv_response = [None if isinstance(r, BaseException)
-                                        else r for r in serv_response]
+                                     else r for r in serv_response]
                 # END async with aiohttp.ClientSession(timeout=timeout) as session
 
                 for r in serv_response:
                     if r is None or r.status != 200:
                         raise Exception('Failed to read data entry')
-                        
+
                     _r = dict(await r.json())
                     data.extend(_r["data"])
                 # END for r in serv_response
