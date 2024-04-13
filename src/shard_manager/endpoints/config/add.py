@@ -63,13 +63,13 @@ async def add():
 
     try:
         # Convert the reponse to json object
-        response_json = await request.get_json()
+        request_json = await request.get_json()
 
-        if response_json is None:
+        if request_json is None:
             raise Exception('Payload is empty')
 
         # Convert the json response to dictionary
-        payload = dict(response_json)
+        payload = dict(request_json)
         ic(payload)
 
         # Get the number of servers to add
