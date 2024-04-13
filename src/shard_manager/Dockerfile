@@ -24,4 +24,4 @@ WORKDIR /app
 COPY --chmod=777 . .
 
 # Deploy the application
-CMD ["python", "load_balancer.py"]
+CMD ["python", "shared_manager.py"]
