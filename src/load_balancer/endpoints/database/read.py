@@ -83,73 +83,71 @@ async def read():
         shard_ids: list[str] = []
         shard_valid_ats: list[int] = []
 
-        async with common.lock(Read):
-            async with common.pool.acquire() as conn:
-                async with conn.transaction():
-                    async for record in conn.cursor(
-                        '''--sql
-                        SELECT
-                            shard_id,
-                            valid_at
-                        FROM
-                            ShardT
-                        WHERE
-                            (stud_id_low <= ($2::INTEGER)) AND
-                            (($1::INTEGER) < stud_id_low + shard_size)
-                        FOR SHARE;
-                        ''',
-                            low, high):
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                async for record in conn.cursor(
+                    '''--sql
+                    SELECT
+                        shard_id,
+                        valid_at
+                    FROM
+                        ShardT
+                    WHERE
+                        (stud_id_low <= ($2::INTEGER)) AND
+                        (($1::INTEGER) < stud_id_low + shard_size)
+                    FOR SHARE;
+                    ''',
+                        low, high):
 
-                        shard_ids.append(record["shard_id"])
-                        shard_valid_ats.append(record["valid_at"])
-                    # END async for record in conn.cursor
+                    shard_ids.append(record["shard_id"])
+                    shard_valid_ats.append(record["valid_at"])
+                # END async for record in conn.cursor
 
-                    if len(shard_ids) == 0:
-                        raise Exception('No data entries found')
+                if len(shard_ids) == 0:
+                    raise Exception('No data entries found')
 
-                    data = []
-                    tasks = []
+                data = []
+                tasks = []
 
-                    # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
-                            if len(shard_map[shard_id]) == 0:
-                                continue
+                # Convert to aiohttp request
+                timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats):
+                        if len(shard_map[shard_id]) == 0:
+                            continue
 
-                            # TODO: Change to ConsistentHashMap
-                            server_name = shard_map[shard_id].find(
-                                get_request_id())
+                        # TODO: Change to ConsistentHashMap
+                        server_name = shard_map[shard_id].find(
+                            get_request_id())
 
-                            tasks.append(asyncio.create_task(
-                                read_get_wrapper(
-                                    session=session,
-                                    server_name=server_name,
-                                    json_payload={
-                                        "shard": shard_id,
-                                        "stud_id": stud_id,
-                                        "valid_at": shard_valid_at
-                                    }
-                                )
-                            ))
-                        # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
+                        tasks.append(asyncio.create_task(
+                            read_get_wrapper(
+                                session=session,
+                                server_name=server_name,
+                                json_payload={
+                                    "shard": shard_id,
+                                    "stud_id": stud_id,
+                                    "valid_at": shard_valid_at
+                                }
+                            )
+                        ))
+                    # END for shard_id, shard_valid_at in zip(shard_ids, shard_valid_ats)
 
-                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                        serv_response = [None if isinstance(r, BaseException)
-                                         else r for r in serv_response]
-                    # END async with aiohttp.ClientSession(timeout=timeout) as session
+                    serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                    serv_response = [None if isinstance(r, BaseException)
+                                        else r for r in serv_response]
+                # END async with aiohttp.ClientSession(timeout=timeout) as session
 
-                    for r in serv_response:
-                        if r is None or r.status != 200:
-                            raise Exception('Failed to read data entry')
-                            
-                        _r = dict(await r.json())
-                        data.extend(_r["data"])
-                    # END for r in serv_response
+                for r in serv_response:
+                    if r is None or r.status != 200:
+                        raise Exception('Failed to read data entry')
+                        
+                    _r = dict(await r.json())
+                    data.extend(_r["data"])
+                # END for r in serv_response
 
-                # END async with conn.transaction()
-            # END async with common.pool.acquire()
-        # END async with common.lock(Read)
+            # END async with conn.transaction()
+        # END async with common.pool.acquire()
 
         # Return the response payload
         return jsonify(ic({

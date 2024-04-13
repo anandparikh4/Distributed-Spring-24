@@ -61,81 +61,79 @@ async def delete():
 
         # Get the shard name containing the entry
 
-        async with common.lock(Read):
-            async with common.pool.acquire() as conn:
-                async with conn.transaction():
-                    record = await conn.fetchrow(
-                        '''--sql
-                        SELECT
-                            shard_id,
-                            valid_at
-                        FROM
-                            ShardT
-                        WHERE
-                            (stud_id_low <= ($1::INTEGER)) AND
-                            (($1::INTEGER) < stud_id_low + shard_size)
-                        FOR UPDATE;
-                        ''',
-                        stud_id)
-
-                    if record is None:
-                        raise Exception(f'stud_id {stud_id} does not exist')
-
-                    shard_id: str = record["shard_id"]
-                    shard_valid_at: int = record["valid_at"]
-
-                    # TODO: Change to ConsistentHashMap
-                    server_names = shard_map[shard_id].getServerList()
-
-                    # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(
-                        connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        tasks = [asyncio.create_task(
-                            del_put_wrapper(
-                                session=session,
-                                server_name=server_name,
-                                json_payload={
-                                    "shard": shard_id,
-                                    "stud_id": stud_id,
-                                    "valid_at": shard_valid_at
-                                }
-                            )
-                        ) for server_name in server_names]
-
-                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                        serv_response = [None if isinstance(r, BaseException)
-                                            else r for r in serv_response]
-                    # END async with aiohttp.ClientSession
-
-                    max_valid_at = shard_valid_at
-                    # If all replicas are not updated, then return an error
-                    for r in serv_response:
-                        if r is None or r.status != 200:
-                            raise Exception('Failed to delete data entry')
-                        
-                        ic(r)
-
-                        resp = dict(await r.json())
-                        cur_valid_at = int(resp["valid_at"])
-                        max_valid_at = max(max_valid_at, cur_valid_at)
-                    # END for r in serv_response
-
-                    await conn.execute(
-                        '''--sql
-                        UPDATE
-                            ShardT
-                        SET
-                            valid_at = ($1::INTEGER)
-                        WHERE
-                            shard_id = ($2::TEXT)
-                        ''',
-                        max_valid_at,
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                record = await conn.fetchrow(
+                    '''--sql
+                    SELECT
                         shard_id,
-                    )
-                # END async with conn.transaction()
-            # END async with common.pool.acquire() as conn
-        # END async with common.lock(Read)
+                        valid_at
+                    FROM
+                        ShardT
+                    WHERE
+                        (stud_id_low <= ($1::INTEGER)) AND
+                        (($1::INTEGER) < stud_id_low + shard_size)
+                    FOR UPDATE;
+                    ''',
+                    stud_id)
+
+                if record is None:
+                    raise Exception(f'stud_id {stud_id} does not exist')
+
+                shard_id: str = record["shard_id"]
+                shard_valid_at: int = record["valid_at"]
+
+                # TODO: Change to ConsistentHashMap
+                server_names = shard_map[shard_id].getServerList()
+
+                # Convert to aiohttp request
+                timeout = aiohttp.ClientTimeout(
+                    connect=REQUEST_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    tasks = [asyncio.create_task(
+                        del_put_wrapper(
+                            session=session,
+                            server_name=server_name,
+                            json_payload={
+                                "shard": shard_id,
+                                "stud_id": stud_id,
+                                "valid_at": shard_valid_at
+                            }
+                        )
+                    ) for server_name in server_names]
+
+                    serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                    serv_response = [None if isinstance(r, BaseException)
+                                        else r for r in serv_response]
+                # END async with aiohttp.ClientSession
+
+                max_valid_at = shard_valid_at
+                # If all replicas are not updated, then return an error
+                for r in serv_response:
+                    if r is None or r.status != 200:
+                        raise Exception('Failed to delete data entry')
+                    
+                    ic(r)
+
+                    resp = dict(await r.json())
+                    cur_valid_at = int(resp["valid_at"])
+                    max_valid_at = max(max_valid_at, cur_valid_at)
+                # END for r in serv_response
+
+                await conn.execute(
+                    '''--sql
+                    UPDATE
+                        ShardT
+                    SET
+                        valid_at = ($1::INTEGER)
+                    WHERE
+                        shard_id = ($2::TEXT)
+                    ''',
+                    max_valid_at,
+                    shard_id,
+                )
+            # END async with conn.transaction()
+        # END async with common.pool.acquire() as conn
 
         # Return the response payload
         return jsonify(ic({

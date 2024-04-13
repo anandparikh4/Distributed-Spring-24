@@ -71,105 +71,103 @@ async def write():
         # [shard_id] -> (list of entries, valid_at)
         shard_data: Dict[str, Tuple[List[Dict[str, Any]], int]] = {}
 
-        async with common.lock(Read):
-            async with common.pool.acquire() as conn:
-                async with conn.transaction():
-                    get_shard_id_stmt = await conn.prepare(
-                        '''--sql
-                        SELECT
-                            shard_id
-                        FROM
-                            ShardT
-                        WHERE
-                            (stud_id_low <= ($1::INTEGER)) AND
-                            (($1::INTEGER) < stud_id_low + shard_size);
-                        ''')
+        async with common.pool.acquire() as conn:
+            async with conn.transaction():
+                get_shard_id_stmt = await conn.prepare(
+                    '''--sql
+                    SELECT
+                        shard_id
+                    FROM
+                        ShardT
+                    WHERE
+                        (stud_id_low <= ($1::INTEGER)) AND
+                        (($1::INTEGER) < stud_id_low + shard_size);
+                    ''')
 
-                    get_valid_at_stmt = await conn.prepare(
-                        '''--sql
-                        SELECT
-                            valid_at
-                        FROM
-                            ShardT
-                        WHERE
-                            shard_id = $1::TEXT
-                        FOR UPDATE;
-                        ''')
+                get_valid_at_stmt = await conn.prepare(
+                    '''--sql
+                    SELECT
+                        valid_at
+                    FROM
+                        ShardT
+                    WHERE
+                        shard_id = $1::TEXT
+                    FOR UPDATE;
+                    ''')
 
-                    update_shard_info_stmt = await conn.prepare(
-                        '''--sql
-                        UPDATE
-                            ShardT
-                        SET
-                            valid_at = ($1::INTEGER)
-                        WHERE
-                            shard_id = ($2::TEXT);
-                        ''')
+                update_shard_info_stmt = await conn.prepare(
+                    '''--sql
+                    UPDATE
+                        ShardT
+                    SET
+                        valid_at = ($1::INTEGER)
+                    WHERE
+                        shard_id = ($2::TEXT);
+                    ''')
 
-                    for entry in data:
-                        stud_id = int(entry["stud_id"])
-                        record = await get_shard_id_stmt.fetchrow(stud_id)
+                for entry in data:
+                    stud_id = int(entry["stud_id"])
+                    record = await get_shard_id_stmt.fetchrow(stud_id)
 
-                        if record is None:
+                    if record is None:
+                        raise Exception(
+                            f'Shard for {stud_id = } does not exist')
+
+                    shard_id: str = record["shard_id"]
+
+                    if shard_id not in shard_data:
+                        shard_data[shard_id] = ([], 0)
+
+                    shard_data[shard_id][0].append(entry)
+                # END for entry in data
+
+                # To prevent deadlocks in the database, sort the shard_ids
+                for shard_id in sorted(shard_data.keys()):
+                    shard_valid_at: int = await get_valid_at_stmt.fetchval(shard_id)
+                    shard_data[shard_id] = (shard_data[shard_id][0],
+                                            shard_valid_at)
+
+                for shard_id in shard_data:
+                    # TODO: Chage to ConsistentHashMap
+                    server_names = shard_map[shard_id].getServerList()
+
+                    # Convert to aiohttp request
+                    timeout = aiohttp.ClientTimeout(
+                        connect=REQUEST_TIMEOUT)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        tasks = [asyncio.create_task(
+                            write_post_wrapper(
+                                session=session,
+                                server_name=server_name,
+                                json_payload={
+                                    "shard": shard_id,
+                                    "data": shard_data[shard_id][0],
+                                    "valid_at": shard_data[shard_id][1]
+                                }
+                            )
+                        ) for server_name in server_names]
+
+                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                        serv_response = [None if isinstance(r, BaseException)
+                                            else r for r in serv_response]
+                    # END async with aiohttp.ClientSession
+
+                    max_valid_at = shard_data[shard_id][1]
+                    # If all replicas are not updated, then return an error
+                    for r in serv_response:
+                        if r is None or r.status != 200:
                             raise Exception(
-                                f'Shard for {stud_id = } does not exist')
+                                'Failed to write all data entries')
 
-                        shard_id: str = record["shard_id"]
+                        resp = dict(await r.json())
+                        cur_valid_at = int(resp["valid_at"])
+                        max_valid_at = max(max_valid_at, cur_valid_at)
+                    # END for r in serv_response
 
-                        if shard_id not in shard_data:
-                            shard_data[shard_id] = ([], 0)
-
-                        shard_data[shard_id][0].append(entry)
-                    # END for entry in data
-
-                    # To prevent deadlocks in the database, sort the shard_ids
-                    for shard_id in sorted(shard_data.keys()):
-                        shard_valid_at: int = await get_valid_at_stmt.fetchval(shard_id)
-                        shard_data[shard_id] = (shard_data[shard_id][0],
-                                                shard_valid_at)
-
-                    for shard_id in shard_data:
-                        # TODO: Chage to ConsistentHashMap
-                        server_names = shard_map[shard_id].getServerList()
-
-                        # Convert to aiohttp request
-                        timeout = aiohttp.ClientTimeout(
-                            connect=REQUEST_TIMEOUT)
-                        async with aiohttp.ClientSession(timeout=timeout) as session:
-                            tasks = [asyncio.create_task(
-                                write_post_wrapper(
-                                    session=session,
-                                    server_name=server_name,
-                                    json_payload={
-                                        "shard": shard_id,
-                                        "data": shard_data[shard_id][0],
-                                        "valid_at": shard_data[shard_id][1]
-                                    }
-                                )
-                            ) for server_name in server_names]
-
-                            serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                            serv_response = [None if isinstance(r, BaseException)
-                                             else r for r in serv_response]
-                        # END async with aiohttp.ClientSession
-
-                        max_valid_at = shard_data[shard_id][1]
-                        # If all replicas are not updated, then return an error
-                        for r in serv_response:
-                            if r is None or r.status != 200:
-                                raise Exception(
-                                    'Failed to write all data entries')
-
-                            resp = dict(await r.json())
-                            cur_valid_at = int(resp["valid_at"])
-                            max_valid_at = max(max_valid_at, cur_valid_at)
-                        # END for r in serv_response
-
-                        await update_shard_info_stmt.executemany([(max_valid_at, shard_id)])
-                    # END for shard_id in shard_data
-                # END async with conn.transaction()
-            # END async with common.pool.acquire() as conn
-        # END async with common.lock(Read)
+                    await update_shard_info_stmt.executemany([(max_valid_at, shard_id)])
+                # END for shard_id in shard_data
+            # END async with conn.transaction()
+        # END async with common.pool.acquire() as conn
 
         # Return the response payload
         return jsonify(ic({
