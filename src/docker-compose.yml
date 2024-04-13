@@ -44,6 +44,11 @@ services:
     environment:
       HASH_NUM: 1
       DEBUG: "true"
+      POSTGRES_HOST: "Database"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Shard-Manager:
     build: ./shard_manager
@@ -59,6 +64,11 @@ services:
     tty: true
     environment:
       DEBUG: "true"
+      POSTGRES_HOST: "Database"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
 
   Database:
     build: ./database
