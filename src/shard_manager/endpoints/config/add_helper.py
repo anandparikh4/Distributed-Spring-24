@@ -161,8 +161,8 @@ async def copy_shards_to_container(
 
                 # Get server A from `shard_map` for the shard K
                 # TODO: Chage to ConsistentHashMap
-
                 server = shard_map[shard].find(get_request_id())
+
                 if len(servers_flatlined) > 0:
                     while server in servers_flatlined:
                         server = shard_map[shard].find(get_request_id())
