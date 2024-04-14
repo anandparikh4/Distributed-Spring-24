@@ -29,11 +29,24 @@ async def write():
 
     async def write_post_wrapper(
         session: aiohttp.ClientSession,
-        server_name: str,
+        request_id: int,
+        shard_id: str,
         json_payload: Dict
     ):
         # To allow other tasks to run
         await asyncio.sleep(0)
+
+        async with session.get(f'http://Shard-Manager:5000/get_primary',
+                               json={'request_id': request_id,
+                                     'shard': shard_id}) as response:
+            await response.read()
+
+        server_info = await response.json()
+        server_name = server_info.get('primary')
+        secondary = server_info.get('secondary')
+
+        json_payload["is_primary"] = True
+        json_payload["secondary_servers"] = secondary
 
         async with session.post(f'http://{server_name}:5000/write',
                                 json=json_payload) as response:
@@ -123,49 +136,40 @@ async def write():
 
                 # To prevent deadlocks in the database, sort the shard_ids
                 for shard_id in sorted(shard_data.keys()):
-                    shard_valid_at: int = await get_valid_at_stmt.fetchval(shard_id)
+                    shard_valid_at: int = await get_valid_at_stmt.fetchval(shard_id) + 1
                     shard_data[shard_id] = (shard_data[shard_id][0],
                                             shard_valid_at)
 
-                for shard_id in shard_data:
-                    # TODO: Chage to ConsistentHashMap
-                    server_names = shard_map[shard_id].getServerList()
-
-                    # Convert to aiohttp request
-                    timeout = aiohttp.ClientTimeout(
-                        connect=REQUEST_TIMEOUT)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    for shard_id in shard_data:
+                        # Convert to aiohttp request
                         tasks = [asyncio.create_task(
                             write_post_wrapper(
                                 session=session,
-                                server_name=server_name,
+                                request_id=get_request_id(),
+                                shard_id=shard_id,
                                 json_payload={
                                     "shard": shard_id,
                                     "data": shard_data[shard_id][0],
-                                    "valid_at": shard_data[shard_id][1]
+                                    "term": shard_data[shard_id][1],
                                 }
                             )
-                        ) for server_name in server_names]
+                        )]
 
                         serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                         serv_response = [None if isinstance(r, BaseException)
-                                            else r for r in serv_response]
-                    # END async with aiohttp.ClientSession
+                                         else r for r in serv_response]
+                        serv_response = serv_response[0]
 
-                    max_valid_at = shard_data[shard_id][1]
-                    # If all replicas are not updated, then return an error
-                    for r in serv_response:
-                        if r is None or r.status != 200:
-                            raise Exception(
-                                'Failed to write all data entries')
+                        # If all replicas are not updated, then return an error
+                        if serv_response is None or serv_response.status != 200:
+                            raise Exception('Failed to write all data entries')
 
-                        resp = dict(await r.json())
-                        cur_valid_at = int(resp["valid_at"])
-                        max_valid_at = max(max_valid_at, cur_valid_at)
-                    # END for r in serv_response
-
-                    await update_shard_info_stmt.executemany([(max_valid_at, shard_id)])
-                # END for shard_id in shard_data
+                        await update_shard_info_stmt.executemany(
+                            [(shard_data[shard_id][1], shard_id)])
+                    # END for shard_id in shard_data
+                # END async with aiohttp.ClientSession
             # END async with conn.transaction()
         # END async with common.pool.acquire() as conn
 
