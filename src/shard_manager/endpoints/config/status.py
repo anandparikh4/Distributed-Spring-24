@@ -45,9 +45,12 @@ async def status():
                 # END async with conn.transaction()
             # END async with common.pool.acquire()
 
+            for shard_info in shards:
+                shard_info['primary'] = shard_primary[shard_info['shard_id']]
+
             servers_to_shards: Dict[str, List[str]] = {}
             _shard_map = {k: v.getServerList() for k, v in shard_map.items()}
-            
+
             ic(_shard_map)
 
             for shard, servers in _shard_map.items():
@@ -57,7 +60,7 @@ async def status():
                     servers_to_shards[server].append(shard)
                 # END for server in servers
             # END for shard, servers in shard_map.items()
-            
+
             ic(servers_to_shards)
 
             # Return the response payload

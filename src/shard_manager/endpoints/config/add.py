@@ -2,6 +2,7 @@ from quart import Blueprint, jsonify, request
 
 from utils import *
 from endpoints.config.add_helper import *
+from elect_primary import elect_primary
 
 blueprint = Blueprint('add', __name__)
 
@@ -57,6 +58,7 @@ async def add():
     global heartbeat_fail_count
     global serv_ids
     global shard_map
+    global shard_primary
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -130,7 +132,11 @@ async def add():
             for shard in new_shard_ids:
                 # Change to ConsistentHashMap
                 shard_map[shard] = ConsistentHashMap()
+
+                shard_primary[shard] = ""
             # END for shard in new_shards
+
+            elect_primary()
 
             # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)

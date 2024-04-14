@@ -1,6 +1,8 @@
 from quart import Blueprint, jsonify, request
 
+from endpoints.config import elect_primary
 from utils import *
+from elect_primary import elect_primary
 
 from .add import spawn_container
 
@@ -49,6 +51,7 @@ async def init():
     global heartbeat_fail_count
     global serv_ids
     global shard_map
+    global shard_primary
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -140,7 +143,11 @@ async def init():
             for shard in new_shard_ids:
                 # Change to ConsistentHashMap
                 shard_map[shard] = ConsistentHashMap()
+
+                shard_primary[shard] = ""
             # END for shard in new_shards
+
+            elect_primary()
 
             # Spawn new containers
             docker_semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
