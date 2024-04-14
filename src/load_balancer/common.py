@@ -8,14 +8,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import aiohttp
 import asyncpg
-from aiodocker import Docker
 from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
 
 from consts import *
 from hash import ConsistentHashMap
-
 
 # Lock to protect the replicas list
 lock = FifoLock()

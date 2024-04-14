@@ -1,7 +1,9 @@
+import aiohttp
 from quart import Blueprint, jsonify, request
+
 import common
 from common import *
-import aiohttp
+
 from .rules import bookkeeping
 
 blueprint = Blueprint('update', __name__)
@@ -46,7 +48,7 @@ async def data_write():
         # decode payload
         shard_id = str(payload.get('shard', ""))
         term = int(payload.get('term', -1))
-        data = list(payload.get('data', []))
+        data = dict(payload.get('data', {}))
         is_primary = str(payload.get('is_primary', 'false')).lower() == 'true'
         secondary_servers = list(payload.get('secondary_servers', []))
         stud_id = int(payload.get('stud_id', ""))

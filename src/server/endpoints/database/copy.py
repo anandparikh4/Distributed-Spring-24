@@ -32,7 +32,7 @@ async def copy():
         shards: list[str] = list(payload.get('shards', []))
         terms: list[int] = list(payload.get('terms', []))
 
-        response_payload = {
+        response_payload:Dict[str, Any] = {
             "data": {},
             "log": {}
         }
