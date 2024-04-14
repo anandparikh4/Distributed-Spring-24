@@ -1,3 +1,4 @@
+from elect_primary import elect_primary
 from quart import Blueprint, jsonify, request
 
 from utils import *
@@ -46,6 +47,7 @@ async def rm():
 
     global replicas
     global heartbeat_fail_count
+    global shard_primary
 
     # Allow other tasks to run
     await asyncio.sleep(0)
@@ -126,6 +128,14 @@ async def rm():
             hostnames.extend(random_hostnames)
 
             ic("To delete: ", hostnames)
+
+            hostnames_set = set(hostnames)
+
+            for shard, primary in shard_primary.items():
+                if primary in hostnames_set:
+                    shard_primary[shard] = ""
+
+            elect_primary()
 
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 

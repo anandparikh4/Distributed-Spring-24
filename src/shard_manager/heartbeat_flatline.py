@@ -1,4 +1,5 @@
 from endpoints.config.add_helper import *
+from endpoints.config.elect_primary import *
 from utils import *
 
 
@@ -202,10 +203,12 @@ async def get_heartbeats():
 
                 # Reswapn the flatlined server replicas
                 if len(flatlines) > 0:
+                    servers_flatlined = [name for name, _ in flatlines]
+
+                    elect_primary(servers_flatlined)
+
                     docker_semaphore = asyncio.Semaphore(
                         DOCKER_TASK_BATCH_SIZE)
-                    
-                    servers_flatlined = [name for name, _ in flatlines]
 
                     async with Docker() as docker:
                         tasks = [asyncio.create_task(
