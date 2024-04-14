@@ -1,78 +1,81 @@
 from quart import Blueprint, jsonify, request
-
 import common
 from common import *
-
-from .rules import rules
+from .rules import bookkeeping
 
 blueprint = Blueprint('copy', __name__)
-
 
 @blueprint.route('/copy', methods=['GET'])
 async def copy():
     """
-        Returns all data entries corresponding to the requested shard tables in the server container
+        Returns all data entries and log entries corresponding to the requested shard tables in the server container
 
         Request payload:
-            "shards": ["sh1", "sh2"...]
-            "valid_at": [<valid_at_sh1>, <valid_at_sh2>...]
+            "shards": ["sh1", "sh2", ...]
+            "terms": [<term1>, <term2>, ...]
 
         Response payload:
-            "sh1": [data]
-            "sh2": [data]
-            ...
+            "data"  : {"sh1": [data], "sh2": [data]}
+            "log"   : {"sh1": [log], "sh2": [log]}
             "status": "success"
 
         Error payload:
             "status": "error"
             "message": "error message"
-
     """
 
     try:
-        # Get the shard ids
         payload: dict = await request.get_json()
         ic(payload)
 
+        # decode payload
         shards: list[str] = list(payload.get('shards', []))
-        valid_at: list[int] = list(payload.get('valid_at', -1))
+        terms: list[int] = list(payload.get('terms', []))
 
-        response_payload = {}
-        for shard in shards:
-            response_payload[shard] = []
+        response_payload = {
+            "data": {},
+            "log": {}
+        }
+        for shard_id in shards:
+            response_payload["data"][shard_id] = []
+            response_payload["log"][shard_id] = []
 
-        # Get the data from the database
+        # perform bookkeeping on all shards, then get data from StudT and logs from LogT
         async with common.pool.acquire() as conn:
             async with conn.transaction():
 
-                tasks = [asyncio.create_task(rules(shard, valid_at_shard))
-                         for shard, valid_at_shard in zip(shards, valid_at)]
+                tasks = [asyncio.create_task(bookkeeping(shard_id, term, "r")) 
+                        for shard_id, term in zip(shards, terms)]
 
                 res = await asyncio.gather(*tasks, return_exceptions=True)
 
                 if any(res):
-                    raise Exception(f'Error in applying rules: {res}')
-
-                # for shard in shards:
-                #     await rules(shard, valid_at)
-
-                stmt = await conn.prepare(
-                    '''--sql
-                    SELECT Stud_id, Stud_name, Stud_marks
+                    raise Exception(f'Error in performing bookkeeping: {res}')
+                
+                stmt = await conn.prepare('''--sql
+                    SELECT stud_id, stud_name, stud_marks
                     FROM StudT
                     WHERE shard_id = $1::TEXT
-                        AND created_at <= $2::INTEGER;
                     ''')
 
-                for shard, valid_at_shard in zip(shards, valid_at):
-                    async for record in stmt.cursor(shard, valid_at_shard):
+                for shard_id in shards:
+                    async for record in stmt.cursor(shard_id):
                         record = dict(record)
-                        response_payload[shard].append(record)
+                        response_payload["data"][shard_id].append(record)
+
+                stmt = await conn.prepare('''--sql
+                    SELECT log_idx, operation, stud_id, content
+                    FROM LogT
+                    WHERE shard_id = $1::TEXT
+                    ''')
+                
+                for shard_id in shards:
+                    async for log in stmt.cursor(shard_id):
+                        log = dict(log)
+                        response_payload["log"][shard_id].append(log)
 
         response_payload['status'] = 'success'
-
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:
-
         return jsonify(ic(err_payload(e))), 400

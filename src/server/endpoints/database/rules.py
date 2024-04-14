@@ -3,7 +3,7 @@ from common import *
 
 
 # Bookkeeping for enforcing synchronization between shard replicas across servers
-# Simply do 'await rules(shard_id, term, op)' in each op. No return value
+# Simply do 'await bookkeeping(shard_id, term, op)' in each op. No return value
 async def bookkeeping(
     shard_id: str,
     term: int,
@@ -20,7 +20,7 @@ async def bookkeeping(
 
     try:
         async with common.pool.acquire() as conn:
-            async with conn.transaction():  # Enforce rule by executing database operations
+            async with conn.transaction():  # perform bookkeeping by executing database operations
 
                 # get the term from TermT
                 term_row = await conn.fetchrow('''--sql
@@ -30,7 +30,7 @@ async def bookkeeping(
                 ''',shard_id)
 
                 if term_row is None:
-                    raise Exception(f"Failed to enforce rule")
+                    raise Exception(f"Failed to performing bookkeeping")
                 last_idx = term_row["last_idx"]
                 executed = term_row["executed"]
 
@@ -53,10 +53,10 @@ async def bookkeeping(
                     ''',shard_id,last_idx)
 
                     if log_row is None:
-                        raise Exception(f"Failed to enforce rule")
+                        raise Exception(f"Failed to perform bookkeeping")
                     operation = log_row["operation"]
                     stud_id = log_row["stud_id"]
-                    content = log_row["content"]
+                    content = dict(log_row["content"])
                     
                     # do different things for different operations
                     # write
@@ -70,8 +70,8 @@ async def bookkeeping(
                         ''')
                         await stmt.executemany([(
                             int(key),
-                            content[key][0],
-                            content[key][1],
+                            str(content[key][0]),
+                            int(content[key][1]),
                             shard_id
                         ) for key in content])
                     # update
@@ -79,16 +79,15 @@ async def bookkeeping(
                         await conn.execute('''--sql
                             UPDATE StudT
                             SET stud_name = $3::TEXT , stud_marks = $4::INTEGER
-                            WHERE shard_id = $1
-                            AND stud_id = $2
-                        ''',shard_id,stud_id,content[stud_id][0],content[stud_id][1])
+                            WHERE shard_id = $1::TEXT
+                            AND stud_id = $2::INTEGER
+                        ''',shard_id,stud_id,str(content[stud_id][0]),int(content[stud_id][1]))
                     # delete
                     elif(operation == "d"):
                         await conn.execute('''--sql
                             DELETE FROM StudT
-                            WHERE shard_id = $1
-                            AND stud_id = $2
-                        ''',shard_id,stud_id)
+                            WHERE stud_id = $1
+                        ''',stud_id)
                     # read
                     else:   # operation == "r"
                         pass
@@ -109,26 +108,6 @@ async def bookkeeping(
                         WHERE shard_id = $1::TEXT
                         AND log_idx = $2::INTEGER
                     ''',shard_id,last_idx)
-
-    except Exception as e:
-        raise e
-
-
-# Service the request after bookkeeping
-async def service(
-    payload: dict,
-    operation: str
-):
-    """
-        Update TermT with new last_idx
-        Add new log entry in LogT
-    """
-
-    try:
-        async with common.pool.acquire() as conn:
-            async with conn.transaction():
-                # decode payload based on the operation
-                pass
 
     except Exception as e:
         raise e
