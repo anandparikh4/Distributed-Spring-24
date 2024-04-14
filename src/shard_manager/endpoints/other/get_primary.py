@@ -15,6 +15,7 @@ async def get_primary():
     `Response Payload`
         `shard`: str
         `primary`: str
+        `secondary`: list of str
     """
 
     await asyncio.sleep(0)
@@ -41,11 +42,15 @@ async def get_primary():
 
     try:
         async with common.lock(Read):
-            primary = shard_map[shard].find(request_id)
+            primary = shard_primary[shard]
+            secondary = [server
+                         for server in shard_map[shard].getServerList()
+                         if server != primary]
 
         return jsonify(ic({
             'shard': shard,
-            'primary': primary
+            'primary': primary,
+            'secondary': secondary,
         })), 200
 
     except Exception as e:

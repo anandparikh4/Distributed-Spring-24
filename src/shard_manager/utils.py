@@ -16,15 +16,6 @@ class Write(asyncio.Future):
 # END class Write
 
 
-def random_hostname():
-    """
-    Generate a random hostname.
-    """
-
-    return f'Server-{random.randrange(0, 1000):03}-{int(time.time()*1e3) % 1000:03}'
-# END random_hostname
-
-
 def err_payload(err: Exception):
     """
     Generate an error payload.
