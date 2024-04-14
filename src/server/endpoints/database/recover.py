@@ -4,14 +4,16 @@ from common import *
 
 blueprint = Blueprint('copy', __name__)
 
+
 @blueprint.route('/copy', methods=['GET'])
 async def copy():
     """
         Copy entire StudT, LogT and accordingly update TermT
 
         Request payload:
-            "data"  : {"sh1": [data], "sh2": [data]}
-            "log"   : {"sh1": [log], "sh2": [log]}
+            "data"  : {"sh1": [data], "sh2": [data], ...}
+            "log"   : {"sh1": [log], "sh2": [log], ...}
+            "term"  : {"sh1": <term>, "sh2": <term>, ...}
 
         Response payload:
             "status": "success"
@@ -29,15 +31,22 @@ async def copy():
         # decode payload
         payload_data: dict = dict(payload.get("data", {}))
         payload_log: dict = dict(payload.get("log", {}))
+        payload_term: dict = dict(payload.get("term", {}))
 
         all_data = []
-        for shard_id, records in payload_data:
+        for shard_id, records in payload_data.items():
             for record in records:
-                all_data.append((record["stud_id"], record["stud_name"], record["stud_marks"], shard_id))
+                all_data.append(
+                    (record["stud_id"], record["stud_name"],
+                     record["stud_marks"], shard_id))
+
         all_logs = []
-        for shard_id, logs in payload_log:
+        for shard_id, logs in payload_log.items():
             for log in logs:
-                all_logs.append((log["log_idx"] , shard_id , log["operation"] , log["stud_id"] , dict(log["content"])))
+                all_logs.append(
+                    (log["log_idx"], shard_id,
+                     log["operation"], log["stud_id"],
+                     log["content"]))
 
         # copy full StudT and LogT, update TermT accordingly
         async with common.pool.acquire() as conn:
@@ -64,13 +73,14 @@ async def copy():
                 await stmt.executemany(all_logs)
 
                 # update TermT
-                all_terms = []
-                async for log in conn.cursor('''--sql
-                    SELECT shard_id , MAX(log_idx) as last_idx
-                    FROM LogT
-                    GROUP BY shard_id
-                '''):
-                    all_terms.append((log["shard_id"] , int(log["last_idx"] , True)))
+                # all_terms = []
+                # async for log in conn.cursor('''--sql
+                #     SELECT shard_id , MAX(log_idx) as last_idx
+                #     FROM LogT
+                #     GROUP BY shard_id
+                # '''):
+                #     all_terms.append(
+                #         (log["shard_id"], int(log["last_idx"], True)))
 
                 stmt = await conn.prepare('''--sql
                     INSERT INTO TermT
@@ -78,7 +88,10 @@ async def copy():
                             $2::INTEGER,
                             $3::BOOLEAN);
                     ''')
-                await stmt.executemany(all_terms)
+                await stmt.executemany([
+                    (shard_id, term, True)
+                    for shard_id, term in payload_term.items()
+                ])
 
         response_payload = {
             "status": 200,
