@@ -50,7 +50,7 @@ async def read():
             await response.read()
 
         server_name = await response.json()
-        server_name = server_name.get('server_name')
+        server_name = server_name.get('server')
 
         async with session.get(f'http://{server_name}:5000/read',
                                json=json_payload) as response:
