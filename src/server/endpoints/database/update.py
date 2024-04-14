@@ -76,7 +76,7 @@ async def data_write():
                             $3::TEXT,
                             $4::INTEGER,
                             $5::JSON);
-                    ''',term,shard_id,"u",stud_id,content)
+                    ''',term,shard_id,"u",stud_id,json.dumps(content))
                 
                 if is_primary:
                     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)

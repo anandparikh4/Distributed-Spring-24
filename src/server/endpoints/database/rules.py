@@ -26,8 +26,9 @@ async def bookkeeping(
                 term_row = await conn.fetchrow('''--sql
                     SELECT *
                     FROM TermT
-                    WHERE shard_id = $1::TEXT;
-                ''',shard_id)
+                    WHERE shard_id = $1::TEXT
+                    FOR UPDATE;  -- lock the row for update
+                ''', shard_id)
 
                 if term_row is None:
                     raise Exception(f"Failed to performing bookkeeping")
@@ -35,32 +36,33 @@ async def bookkeeping(
                 executed = term_row["executed"]
 
                 # last write/update/delete was successful was not executed on database, so execute now
-                if(((term > last_idx) or (term == last_idx and op == "r")) and executed == False):
+                if (((term > last_idx) or (term == last_idx and op == "r")) and executed == False):
 
                     # update TermT executed to True
                     await conn.execute('''--sql
                         UPDATE TermT
                         SET executed = TRUE
                         WHERE shard_id = $1::TEXT                   
-                    ''',shard_id)
+                    ''', shard_id)
 
-                    # get the log from LogT                        
+                    # get the log from LogT
                     log_row = await conn.fetchrow('''--sql
                         SELECT *
                         FROM LogT
                         WHERE shard_id = $1::TEXT
                         AND log_idx = $2::INTEGER
-                    ''',shard_id,last_idx)
+                    ''', shard_id, last_idx)
 
                     if log_row is None:
                         raise Exception(f"Failed to perform bookkeeping")
                     operation = log_row["operation"]
-                    stud_id = log_row["stud_id"]
-                    content = dict(log_row["content"])
-                    
+                    stud_id = log_row.get("stud_id", -1)
+                    content = log_row.get("content", "{}")
+                    content = json.loads(content)
+
                     # do different things for different operations
                     # write
-                    if(operation == "w"):
+                    if (operation == "w"):
                         stmt = await conn.prepare('''--sql
                             INSERT INTO StudT (stud_id , stud_name , stud_marks , shard_id)
                             VALUES ($1::INTEGER,
@@ -75,39 +77,39 @@ async def bookkeeping(
                             shard_id
                         ) for key in content])
                     # update
-                    elif(operation == "u"):
+                    elif (operation == "u"):
                         await conn.execute('''--sql
                             UPDATE StudT
                             SET stud_name = $3::TEXT , stud_marks = $4::INTEGER
                             WHERE shard_id = $1::TEXT
                             AND stud_id = $2::INTEGER
-                        ''',shard_id,stud_id,str(content[stud_id][0]),int(content[stud_id][1]))
+                        ''', shard_id, stud_id, str(content[stud_id][0]), int(content[stud_id][1]))
                     # delete
-                    elif(operation == "d"):
+                    elif (operation == "d"):
                         await conn.execute('''--sql
                             DELETE FROM StudT
                             WHERE stud_id = $1
-                        ''',stud_id)
+                        ''', stud_id)
                     # read
                     else:   # operation == "r"
                         pass
 
                 # last write/update/delete was not successful, so rollback
-                elif((term < last_idx) or (term == last_idx and op != "r")):
-                    
+                elif ((term < last_idx) or (term == last_idx and op != "r")):
+
                     # update TermT last_idx to last_idx-1 and executed to True
                     await conn.execute('''--sql
                         UPDATE TermT
                         SET last_idx = $2::INTEGER , executed = TRUE
                         WHERE shard_id = $1::TEXT
-                    ''',shard_id,last_idx-1)
+                    ''', shard_id, last_idx-1)
 
                     # delete last_idx log from LogT
                     await conn.execute('''--sql
                         DELETE FROM LogT
                         WHERE shard_id = $1::TEXT
                         AND log_idx = $2::INTEGER
-                    ''',shard_id,last_idx)
+                    ''', shard_id, last_idx)
 
     except Exception as e:
         raise e

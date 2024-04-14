@@ -1,7 +1,9 @@
+import aiohttp
 from quart import Blueprint, jsonify, request
+
 import common
 from common import *
-import aiohttp
+
 from .rules import bookkeeping
 
 blueprint = Blueprint('write', __name__)
@@ -75,7 +77,7 @@ async def write():
                             $3::TEXT,
                             NULL,
                             $4::JSON);
-                    ''',term,shard_id,"w",content)
+                    ''',term,shard_id,"w",json.dumps(content))
                 
                 if is_primary:
                     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)

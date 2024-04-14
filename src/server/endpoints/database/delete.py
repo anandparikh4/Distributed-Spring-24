@@ -6,6 +6,7 @@ from .rules import bookkeeping
 
 blueprint = Blueprint('delete', __name__)
 
+
 async def del_put_wrapper(
     session: aiohttp.ClientSession,
     server_name: str,
@@ -15,10 +16,11 @@ async def del_put_wrapper(
     await asyncio.sleep(0)
 
     async with session.delete(f'http://{server_name}:5000/del',
-                                json=json_payload) as response:
+                              json=json_payload) as response:
         await response.read()
 
     return response
+
 
 @blueprint.route('/del', methods=['DELETE'])
 async def delete():
@@ -59,7 +61,7 @@ async def delete():
                     UPDATE TermT
                     SET last_idx = $2 , executed = FALSE
                     WHERE shard_id = $1
-                ''',shard_id,term)
+                ''', shard_id, term)
 
                 # add latest log to LogT
                 await conn.execute('''--sql
@@ -69,27 +71,27 @@ async def delete():
                             $3::TEXT,
                             $4::INTEGER,
                             NULL);
-                    ''',term,shard_id,"d",stud_id)
-                
+                    ''', term, shard_id, "d", stud_id)
+
                 if is_primary:
                     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
                     async with aiohttp.ClientSession(timeout=timeout) as session:
                         tasks = [asyncio.create_task(
-                                del_put_wrapper(
-                                    session=session,
-                                    server_name=server_name,
-                                    json_payload={
-                                        "shard"     : shard_id,
-                                        "term"      : term,
-                                        "stud_id"   : stud_id,
-                                        "is_primary": False
-                                    }
-                                )
-                            ) for server_name in secondary_servers]
+                            del_put_wrapper(
+                                session=session,
+                                server_name=server_name,
+                                json_payload={
+                                    "shard": shard_id,
+                                    "term": term,
+                                    "stud_id": stud_id,
+                                    "is_primary": False
+                                }
+                            )
+                        ) for server_name in secondary_servers]
 
                         serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                         serv_response = [None if isinstance(r, BaseException)
-                                              else r for r in serv_response]
+                                         else r for r in serv_response]
 
                         # If not all replicas are updated, then return an error
                         for r in serv_response:
