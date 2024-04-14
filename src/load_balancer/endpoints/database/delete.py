@@ -94,10 +94,11 @@ async def delete():
                     raise Exception(f'stud_id {stud_id} does not exist')
 
                 shard_id: str = record["shard_id"]
-                shard_valid_at: int = record["valid_at"]
+                # new log to be inserted at valid_at + 1
+                shard_valid_at: int = record["valid_at"] + 1
 
                 # TODO: Change to ConsistentHashMap
-                server_names = shard_map[shard_id].getServerList()
+                # server_names = shard_map[shard_id].getServerList()
 
                 # Convert to aiohttp request
                 timeout = aiohttp.ClientTimeout(
@@ -106,32 +107,26 @@ async def delete():
                     tasks = [asyncio.create_task(
                         del_put_wrapper(
                             session=session,
-                            server_name=server_name,
+                            request_id=get_request_id(),
+                            shard_id=shard_id,
                             json_payload={
                                 "shard": shard_id,
                                 "stud_id": stud_id,
                                 "valid_at": shard_valid_at
                             }
-                        )
-                    ) for server_name in server_names]
+                        ))]
 
                     serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                     serv_response = [None if isinstance(r, BaseException)
                                      else r for r in serv_response]
+                    serv_response = serv_response[0]
                 # END async with aiohttp.ClientSession
 
-                max_valid_at = shard_valid_at
                 # If all replicas are not updated, then return an error
-                for r in serv_response:
-                    if r is None or r.status != 200:
-                        raise Exception('Failed to delete data entry')
+                if serv_response is None or serv_response.status != 200:
+                    raise Exception('Failed to delete data entry')
 
-                    ic(r)
-
-                    resp = dict(await r.json())
-                    cur_valid_at = int(resp["valid_at"])
-                    max_valid_at = max(max_valid_at, cur_valid_at)
-                # END for r in serv_response
+                ic(serv_response)
 
                 await conn.execute(
                     '''--sql
@@ -142,7 +137,7 @@ async def delete():
                     WHERE
                         shard_id = ($2::TEXT)
                     ''',
-                    max_valid_at,
+                    shard_valid_at,
                     shard_id,
                 )
             # END async with conn.transaction()
