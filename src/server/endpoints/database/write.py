@@ -1,12 +1,24 @@
 from quart import Blueprint, jsonify, request
-
 import common
 from common import *
-
-from .rules import rules
+import aiohttp
+from .rules import bookkeeping
 
 blueprint = Blueprint('write', __name__)
 
+async def write_post_wrapper(
+    session: aiohttp.ClientSession,
+    server_name: str,
+    json_payload: dict
+):
+    # To allow other tasks to run
+    await asyncio.sleep(0)
+
+    async with session.post(f'http://{server_name}:5000/write',
+                            json=json_payload) as response:
+        await response.read()
+
+    return response
 
 @blueprint.route('/write', methods=['POST'])
 async def write():
@@ -14,89 +26,88 @@ async def write():
         Write data entries to the database
 
         Request payload:
-            "shard" : <shard_id>
-            "data"  : [{"stud_id": <id1>, ...},
-                      {"stud_id": <id2>, ...},
-                      ...
-                      {"stud_id": <idn>, ...}]
-            "admin"    : true/false (optional)
-            "valid_at" : <valid_at>
+            "shard"             : <shard_id>
+            "term"              : <term>
+            "data"              : [{"stud_id": <id1>, ...},
+                                   {"stud_id": <id2>, ...},
+                                   ...
+                                   {"stud_id": <idn>, ...}]
+            "is_primary"        : true/false (optional)
+            "secondary_servers" : ["server1", ...]
 
         Response payload:
-            "message": Data entries added
-            "valid_at": <valid_at>
-            "status": "success"
-
+            "message"   : Data entries added
+            "status"    : "success"
     """
 
     try:
         payload: dict = await request.get_json()
         ic(payload)
 
-        valid_at = int(payload.get('valid_at', -1))
-        shard_id = str(payload.get('shard', -1))
+        # decode payload
+        shard_id = str(payload.get('shard', ""))
+        term = int(payload.get('term', -1))
         data = list(payload.get('data', []))
+        is_primary = str(payload.get('is_primary', 'false')).lower() == 'true'
+        secondary_servers = list(payload.get('secondary_servers', []))
+        content = {}
+        for _data in data:
+            content[str(_data["stud_id"])] = [str(_data["stud_name"]),int(_data["stud_marks"])]
 
-        admin = str(payload.get('admin', 'false')).lower() == 'true'
+        # perform bookkeeping
+        await bookkeeping(shard_id,term,"w")
 
-        stud_ids = [_data["stud_id"] for _data in data]
-
-        # Insert the data into the database
+        # insert log into LogT and update TermT
         async with common.pool.acquire() as conn:
             async with conn.transaction():
-                stmt = await conn.prepare('''--sql
-                    INSERT INTO StudT (stud_id, stud_name, stud_marks, shard_id, created_at)
-                    VALUES ($1::INTEGER, 
-                            $2::TEXT, 
-                            $3::INTEGER, 
-                            $4::TEXT,
-                            $5::INTEGER);
-                    ''')
-
-                if admin:
-                    term = valid_at
-                else:
-                    await rules(shard_id, valid_at)
-
-                    # Check if stud_id exists
-                    row = await conn.fetchrow('''--sql
-                        SELECT *
-                        FROM StudT
-                        WHERE stud_id = ANY($1::INTEGER[]);
-                    ''', stud_ids)
-
-                    if row is not None:
-                        raise Exception(f"Failed to write")
-
-                    term: int = await conn.fetchval('''--sql
-                        SELECT term 
-                        FROM TermT
-                        WHERE shard_id = $1::TEXT;                         
-                    ''', shard_id)
-
-                    term = max(term, valid_at) + 1
-
-
-                await stmt.executemany([(record_dict['stud_id'],
-                                         record_dict['stud_name'],
-                                         record_dict['stud_marks'],
-                                         shard_id,
-                                         term)
-                                        for record_dict in data])
-
+                # add unexecuted term to TermT
                 await conn.execute('''--sql
                     UPDATE TermT
-                    SET term = $1::INTEGER
-                    WHERE shard_id = $2::TEXT;
-                ''', term, shard_id)
+                    SET last_idx = $2 , executed = FALSE
+                    WHERE shard_id = $1
+                ''',shard_id,term)
 
-        # Send the response
+                # add latest log to LogT
+                await conn.execute('''--sql
+                    INSERT INTO LogT (log_idx , shard_id , operation , stud_id , content)
+                    VALUES ($1::INTEGER,
+                            $2::TEXT,
+                            $3::TEXT,
+                            NULL,
+                            $4::JSON);
+                    ''',term,shard_id,"w",content)
+                
+                if is_primary:
+                    timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        tasks = [asyncio.create_task(
+                                write_post_wrapper(
+                                    session=session,
+                                    server_name=server_name,
+                                    json_payload={
+                                        "shard": shard_id,
+                                        "term": term,
+                                        "data": data,
+                                        "is_primary": False
+                                    }
+                                )
+                            ) for server_name in secondary_servers]
+
+                        serv_response = await asyncio.gather(*tasks, return_exceptions=True)
+                        serv_response = [None if isinstance(r, BaseException)
+                                              else r for r in serv_response]
+
+                        # If not all replicas are updated, then return an error
+                        for r in serv_response:
+                            if r is None or r.status != 200:
+                                raise Exception(
+                                    'Failed to write all data entries')
+
+        # send success response
         response_payload = {
             "message": "Data entries added",
-            "valid_at": term,
             "status": "success"
         }
-
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:

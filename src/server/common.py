@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 from colorama import Fore, Style
