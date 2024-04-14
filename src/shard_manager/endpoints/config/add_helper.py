@@ -53,7 +53,7 @@ async def copy_shards_to_container(
     hostname: str,
     shards: List[str],
     semaphore: asyncio.Semaphore,
-    servers_flatlined: Optional[List[str]]=None
+    servers_flatlined: Optional[List[str]] = None
 ):
     """
     1. Call /config endpoint on the server S with the hostname
@@ -123,7 +123,7 @@ async def copy_shards_to_container(
         # END async with semaphore
     # END get_copy_wrapper
 
-    async def post_write_wrapper(
+    async def post_recover_wrapper(
         session: aiohttp.ClientSession,
         hostname: str,
         payload: Dict,
@@ -132,7 +132,7 @@ async def copy_shards_to_container(
         await asyncio.sleep(0)
 
         async with semaphore:
-            async with session.post(f'http://{hostname}:5000/write',
+            async with session.post(f'http://{hostname}:5000/recover',
                                     json=payload) as response:
                 await response.read()
 
@@ -176,7 +176,7 @@ async def copy_shards_to_container(
             # END for shard in shards
         # END async with conn.transaction()
     # END async with common.pool.acquire() as conn
-    
+
     ic(call_server_shards)
 
     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
@@ -206,7 +206,7 @@ async def copy_shards_to_container(
                 server,
                 payload={
                     "shards": [shard[0] for shard in shards],
-                    "valid_at": [shard[1] for shard in shards],
+                    "terms": [shard[1] for shard in shards],
                 }
             )
         ) for server, shards in call_server_shards.items()]
@@ -218,7 +218,12 @@ async def copy_shards_to_container(
                           for response in copy_responses]
 
         # Get the data from the copy_responses [shard_id -> (list of data, valid_at)]
-        all_data: Dict[str, Tuple[List, int]] = {}
+        # all_data: Dict[str, Tuple[List, int]] = {}
+        all_data: Dict[str, Dict[str, Any]] = {
+            "data": {},
+            "log": {},
+            "term": {},
+        }
 
         for (response, server_shards) in zip(copy_responses,
                                              call_server_shards.values()):
@@ -228,34 +233,32 @@ async def copy_shards_to_container(
             data: Dict = await response.json()
 
             for shard_id, valid_at in server_shards:
-                all_data[shard_id] = (data[shard_id], valid_at)
+                # all_data[shard_id] = (data[shard_id], valid_at)
+                all_data["data"][shard_id] = data["data"][shard_id]
+                all_data["log"][shard_id] = data["log"][shard_id]
+                all_data["term"][shard_id] = valid_at
         # END for (response, shards) in zip(copy_responses, call_server_shards.values())
-        
+
         ic(all_data)
 
         # Call /write on server S to write the shard K
         # Define tasks
         tasks = [asyncio.create_task(
-            post_write_wrapper(
-                session,
-                hostname,
-                payload={
-                    'shard': shard,
-                    'data': data,
-                    'admin': True,
-                    'valid_at': valid_at,
-                }
+            post_recover_wrapper(
+                session=session,
+                hostname=hostname,
+                payload=all_data,
             )
-        ) for shard, (data, valid_at) in all_data.items()]
+        )]
 
         # Wait for all tasks to complete
         write_responses = await asyncio.gather(*tasks, return_exceptions=True)
         write_responses = [None if isinstance(response, BaseException)
                            else response
                            for response in write_responses]
+        write_response = write_responses[0]
 
-        if any(response is None or response.status != 200
-                for response in write_responses):
+        if write_response is None or write_response.status != 200:
             raise Exception(f'Failed to write shards to {hostname}')
 
     # END async with aiohttp.ClientSession
