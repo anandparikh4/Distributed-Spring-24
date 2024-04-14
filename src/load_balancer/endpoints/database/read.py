@@ -138,7 +138,7 @@ async def read():
                                 json_payload={
                                     "shard": shard_id,
                                     "stud_id": stud_id,
-                                    "valid_at": shard_valid_at
+                                    "term": shard_valid_at
                                 }
                             )
                         ))

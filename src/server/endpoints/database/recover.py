@@ -2,11 +2,11 @@ from quart import Blueprint, jsonify, request
 import common
 from common import *
 
-blueprint = Blueprint('copy', __name__)
+blueprint = Blueprint('recover', __name__)
 
 
-@blueprint.route('/copy', methods=['GET'])
-async def copy():
+@blueprint.route('/recover', methods=['POST'])
+async def recover():
     """
         Copy entire StudT, LogT and accordingly update TermT
 
@@ -72,26 +72,13 @@ async def copy():
                     ''')
                 await stmt.executemany(all_logs)
 
-                # update TermT
-                # all_terms = []
-                # async for log in conn.cursor('''--sql
-                #     SELECT shard_id , MAX(log_idx) as last_idx
-                #     FROM LogT
-                #     GROUP BY shard_id
-                # '''):
-                #     all_terms.append(
-                #         (log["shard_id"], int(log["last_idx"], True)))
-
                 stmt = await conn.prepare('''--sql
-                    INSERT INTO TermT
-                    VALUES ($1::TEXT,
-                            $2::INTEGER,
-                            $3::BOOLEAN);
+                    UPDATE TermT
+                    SET last_idx = $2::INTEGER,
+                        executed = TRUE
+                    WHERE shard_id = $1::TEXT;
                     ''')
-                await stmt.executemany([
-                    (shard_id, term, True)
-                    for shard_id, term in payload_term.items()
-                ])
+                await stmt.executemany(payload_term.items())
 
         response_payload = {
             "status": 200,
