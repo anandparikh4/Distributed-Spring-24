@@ -4,7 +4,7 @@ BEGIN TRANSACTION;
 -- Create the table for the term
 CREATE TABLE IF NOT EXISTS TermT (
 	shard_id TEXT PRIMARY KEY,
-	last_idx INTEGER NOT NULL DEFAULT 0
+	last_idx INTEGER NOT NULL DEFAULT 0,
 	executed BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS LogT (
 	operation TEXT NOT NULL,
 	stud_id INTEGER DEFAULT NULL,
 	content JSON DEFAULT NULL,
-	PRIMARY KEY (log_idx,shard_id)
+	PRIMARY KEY (log_idx, shard_id),
 	FOREIGN KEY (shard_id) REFERENCES TermT (shard_id)
 );
 
@@ -32,6 +32,5 @@ CREATE TABLE IF NOT EXISTS LogT (
 CREATE INDEX IF NOT EXISTS idx_studt_shard_id ON StudT (shard_id);
 
 -- Create the index for the log
-CREATE INDEX IF NOT EXISTS idx_logt_shard_id ON LogT (shard_id);
-
+-- CREATE INDEX IF NOT EXISTS idx_logt_shard_id ON LogT (shard_id);
 COMMIT TRANSACTION;
