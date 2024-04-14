@@ -97,9 +97,6 @@ async def delete():
                 # new log to be inserted at valid_at + 1
                 shard_valid_at: int = record["valid_at"] + 1
 
-                # TODO: Change to ConsistentHashMap
-                # server_names = shard_map[shard_id].getServerList()
-
                 # Convert to aiohttp request
                 timeout = aiohttp.ClientTimeout(
                     connect=REQUEST_TIMEOUT)
@@ -112,12 +109,13 @@ async def delete():
                             json_payload={
                                 "shard": shard_id,
                                 "stud_id": stud_id,
-                                "valid_at": shard_valid_at
+                                "term": shard_valid_at
                             }
                         ))]
 
                     serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                    serv_response = [None if isinstance(r, BaseException)
+                    serv_response = [None
+                                     if isinstance(r, BaseException)
                                      else r for r in serv_response]
                     serv_response = serv_response[0]
                 # END async with aiohttp.ClientSession

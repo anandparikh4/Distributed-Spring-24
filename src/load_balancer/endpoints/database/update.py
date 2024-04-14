@@ -33,15 +33,28 @@ async def update():
 
     async def update_put_wrapper(
         session: aiohttp.ClientSession,
-        server_name: str,
+        request_id: int,
+        shard_id: str,
         json_payload: dict
     ):
 
         # To allow other tasks to run
         await asyncio.sleep(0)
 
+        async with session.get(f'http://Shard-Manager:5000/get_primary',
+                               json={'request_id': request_id,
+                                     'shard': shard_id}) as response:
+            await response.read()
+
+        server_info = await response.json()
+        server_name = server_info.get('primary')
+        secondary = server_info.get('secondary')
+
+        json_payload["is_primary"] = True
+        json_payload["secondary_servers"] = secondary
+
         async with session.post(f'http://{server_name}:5000/update',
-                               json=json_payload) as response:
+                                json=json_payload) as response:
             await response.read()
 
         return response
@@ -68,12 +81,12 @@ async def update():
 
         if len(data) == 0:
             raise Exception('Payload does not contain `data` field')
-        
+
         if not all(k in data.keys()
                    for k in
                    ["stud_id", "stud_name", "stud_marks"]):
             raise Exception('Data entry is invalid')
-        
+
         if stud_id != data["stud_id"]:
             raise Exception("Cannot change stud_id field")
 
@@ -98,11 +111,8 @@ async def update():
                     raise Exception(f'stud_id {stud_id} does not exist')
 
                 shard_id: str = record["shard_id"]
-                shard_valid_at: int = record["valid_at"]
-
-                # TODO: Change to ConsistentHashMap
-                server_names = shard_map[shard_id].getServerList()
-                max_valid_at = shard_valid_at
+                # new log to be inserted at valid_at + 1
+                shard_valid_at: int = record["valid_at"] + 1
 
                 # Convert to aiohttp request
                 timeout = aiohttp.ClientTimeout(
@@ -111,31 +121,27 @@ async def update():
                     tasks = [asyncio.create_task(
                         update_put_wrapper(
                             session=session,
-                            server_name=server_name,
+                            request_id=get_request_id(),
+                            shard_id=shard_id,
                             json_payload={
                                 "shard": shard_id,
                                 "stud_id": stud_id,
                                 "data": data,
-                                "valid_at": shard_valid_at
+                                "term": shard_valid_at
                             }
                         )
-                    ) for server_name in server_names]
+                    )]
 
                     serv_response = await asyncio.gather(*tasks, return_exceptions=True)
-                    serv_response = [None if isinstance(r, BaseException)
-                                        else r for r in serv_response]
+                    serv_response = [None
+                                     if isinstance(r, BaseException)
+                                     else r for r in serv_response]
+                    serv_response = serv_response[0]
                 # END async with aiohttp.ClientSession
 
-                max_valid_at = shard_valid_at
                 # If all replicas are not updated, then return an error
-                for r in serv_response:
-                    if r is None or r.status != 200:
-                        raise Exception('Failed to update data entry')
-
-                    resp = dict(await r.json())
-                    cur_valid_at = int(resp["valid_at"])
-                    max_valid_at = max(max_valid_at, cur_valid_at)
-                # END for r in serv_response
+                if serv_response is None or serv_response.status != 200:
+                    raise Exception('Failed to update data entry')
 
                 await conn.execute(
                     '''--sql
@@ -146,7 +152,7 @@ async def update():
                     WHERE
                         shard_id = ($2::TEXT)
                     ''',
-                    max_valid_at,
+                    shard_valid_at,
                     shard_id,
                 )
             # END async with conn.transaction()
