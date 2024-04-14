@@ -43,7 +43,7 @@ def get_container_config(
     """
 
     return {
-        'image': 'server:v2',
+        'image': 'server:v3',
         'detach': True,
         'env': [
             f'SERVER_ID={serv_id:06}',

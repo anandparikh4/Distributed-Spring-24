@@ -5,6 +5,9 @@ RUN ln -s /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
 
 ENV PYTHONUNBUFFERED 1
 
+# install docker
+RUN apk add --no-cache docker
+
 # Enable venv
 RUN python -m venv /opt/venv
 ENV PATH "/opt/venv/bin:$PATH"
@@ -24,4 +27,4 @@ WORKDIR /app
 COPY --chmod=777 . .
 
 # Deploy the application
-CMD ["python", "load_balancer.py"]
+CMD ["./deploy.sh"]

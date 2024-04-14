@@ -27,6 +27,9 @@ services:
     build: ./load_balancer
     image: load:v3
     container_name: Load-Balancer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
     depends_on:
       - Database
     ports:

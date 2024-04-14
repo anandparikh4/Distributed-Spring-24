@@ -48,7 +48,7 @@ async def init():
     try:
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(f'http://Shard-Manager:5000/init',
+            async with session.post(f'http://Shard-Manager:5000/init',
                                    json=await request.get_json()) as response:
                 return jsonify(ic(await response.json())), 200
 

@@ -136,8 +136,6 @@ async def rm():
                 if primary in hostnames_set:
                     shard_primary[shard] = ""
 
-            elect_primary()
-
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
             async def remove_container(
@@ -209,6 +207,9 @@ async def rm():
 
             final_hostnames = ic(replicas.getServerList())
         # END async with common.lock(Write)
+
+        elect_primary()
+        ic(shard_primary)
 
         # Return the response payload
         return jsonify(ic({

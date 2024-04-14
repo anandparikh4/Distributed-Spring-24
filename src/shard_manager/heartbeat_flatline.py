@@ -206,6 +206,7 @@ async def get_heartbeats():
                     servers_flatlined = [name for name, _ in flatlines]
 
                     elect_primary(servers_flatlined)
+                    ic(shard_primary)
 
                     docker_semaphore = asyncio.Semaphore(
                         DOCKER_TASK_BATCH_SIZE)

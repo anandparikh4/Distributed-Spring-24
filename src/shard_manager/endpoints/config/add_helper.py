@@ -7,45 +7,53 @@ async def spawn_container(
     hostname: str,
     semaphore: asyncio.Semaphore
 ):
-    # Allow other tasks to run
-    await asyncio.sleep(0)
+    try:
+        # Allow other tasks to run
+        await asyncio.sleep(0)
 
-    async with semaphore:
-        # spawn new docker containers for the new hostnames
-        container_config = \
-            get_container_config(serv_id, hostname)
+        async with semaphore:
+            # spawn new docker containers for the new hostnames
+            container_config = \
+                get_container_config(serv_id, hostname)
 
-        # create the container
-        container = await docker.containers.create_or_replace(
-            name=hostname,
-            config=container_config,
-        )
+            # create the container
+            container = await docker.containers.create_or_replace(
+                name=hostname,
+                config=container_config,
+            )
 
-        # Attach the container to the network and set the alias
-        my_net = await docker.networks.get('my_net')
-        await my_net.connect({
-            'Container': container.id,
-            'EndpointConfig': {
-                'Aliases': [hostname]
-            }
-        })
+            # Attach the container to the network and set the alias
+            my_net = await docker.networks.get('my_net')
+            await my_net.connect({
+                'Container': container.id,
+                'EndpointConfig': {
+                    'Aliases': [hostname]
+                }
+            })
 
-        if DEBUG:
-            print(f'{Fore.LIGHTGREEN_EX}CREATE | '
-                  f'Created container for {hostname}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
+            if DEBUG:
+                print(f'{Fore.LIGHTGREEN_EX}CREATE | '
+                      f'Created container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
 
-        # start the container
-        await container.start()
+            # start the container
+            await container.start()
 
-        if DEBUG:
-            print(f'{Fore.MAGENTA}SPAWN | '
-                  f'Started container for {hostname}'
-                  f'{Style.RESET_ALL}',
-                  file=sys.stderr)
+            if DEBUG:
+                print(f'{Fore.MAGENTA}SPAWN | '
+                      f'Started container for {hostname}'
+                      f'{Style.RESET_ALL}',
+                      file=sys.stderr)
 
-    # END async with semaphore
+        # END async with semaphore
+    except Exception as e:
+        print(f'{Fore.RED}ERROR | '
+              f'{e.__class__.__name__}: {e}'
+              f'{Style.RESET_ALL}',
+              file=sys.stderr)
+
+        raise e
 # END spawn_container
 
 

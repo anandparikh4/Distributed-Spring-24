@@ -137,8 +137,6 @@ async def add():
                 shard_primary[shard] = ""
             # END for shard in new_shards
 
-            elect_primary()
-
             # Spawn new containers
             semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
@@ -174,6 +172,8 @@ async def add():
                 await asyncio.gather(*tasks, return_exceptions=True)
             # END async with Docker
 
+            elect_primary()
+            ic(shard_primary)
             ic(serv_ids)
 
             await asyncio.sleep(0)

@@ -146,8 +146,6 @@ async def init():
                 shard_primary[shard] = ""
             # END for shard in new_shards
 
-            elect_primary()
-
             # Spawn new containers
             docker_semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
 
@@ -191,6 +189,8 @@ async def init():
                     raise Exception('Failed to spawn containers')
             # END async with Docker
 
+            elect_primary()
+            ic(shard_primary)
             ic(serv_ids)
 
             await asyncio.sleep(0)

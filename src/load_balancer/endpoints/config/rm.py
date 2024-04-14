@@ -49,7 +49,7 @@ async def rm():
     try:
         timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(f'http://Shard-Manager:5000/rm',
+            async with session.delete(f'http://Shard-Manager:5000/rm',
                                    json=await request.get_json()) as response:
                 return jsonify(ic(await response.json())), 200
 
