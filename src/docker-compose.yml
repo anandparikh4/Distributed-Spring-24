@@ -30,9 +30,6 @@ services:
     container_name: Load-Balancer
     depends_on:
       - Database
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    privileged: true
     ports:
       - "5000:5000"
     networks:
@@ -54,6 +51,9 @@ services:
     build: ./shard_manager
     image: shard:v3
     container_name: Shard-Manager
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
     depends_on:
       - Database
     networks:
