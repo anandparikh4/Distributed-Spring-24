@@ -32,18 +32,27 @@ async def read():
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, json=payload) as resp:
                     await resp.read()
+                return resp.status
 
-    tasks = []
-    for r in ranges:
-        payload = {
-            "stud_id": {
-                "low": r[0],
-                "high": r[1]
+    tasks = [asyncio.create_task(
+        wrapper(
+            payload={
+                "stud_id": {
+                    "low": r[0],
+                    "high": r[1]
+                }
             }
-        }
-        tasks.append(asyncio.create_task(wrapper(payload)))
+        )) for r in ranges]
 
-    await asyncio.gather(*tasks)
+    status = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for i, s in enumerate(status):
+        if isinstance(s, BaseException):
+            print(f"Error: {s}")
+            print()
+        elif s != 200:
+            print(f"Status: {s}")
+            print()
 
 
 # END main

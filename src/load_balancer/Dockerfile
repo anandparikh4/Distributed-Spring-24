@@ -6,7 +6,9 @@ RUN ln -s /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
 ENV PYTHONUNBUFFERED 1
 
 # install docker
-RUN apk add --no-cache docker
+RUN apk --no-cache update && \
+	apk --no-cache upgrade && \
+	apk --no-cache add docker-cli
 
 # Enable venv
 RUN python -m venv /opt/venv

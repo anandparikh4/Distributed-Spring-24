@@ -28,7 +28,8 @@ WORKDIR /app
 
 # Install python
 RUN apk --no-cache update && \
-	apk add --no-cache python3
+	apk --no-cache upgrade && \
+	apk --no-cache add python3
 
 # Copy only the necessary files from the builder stage
 COPY --from=builder /opt/venv /opt/venv

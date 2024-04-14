@@ -41,6 +41,7 @@ async def main():
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload) as resp:
                     await resp.read()
+                return resp.status
 
     tasks = []
     cnt = 0
@@ -57,7 +58,15 @@ async def main():
 
     print(f"Total requests: {len(tasks)}")
 
-    await asyncio.gather(*tasks)
+    status = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for i, s in enumerate(status):
+        if isinstance(s, BaseException):
+            print(f"Error: {s}")
+            print()
+        elif s != 200:
+            print(f"Status: {s}")
+            print()
 
 if __name__ == "__main__":
     start = time.perf_counter()
