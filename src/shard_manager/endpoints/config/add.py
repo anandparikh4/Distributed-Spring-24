@@ -1,8 +1,9 @@
 from quart import Blueprint, jsonify, request
 
-from utils import *
 from endpoints.config.add_helper import *
-from elect_primary import elect_primary
+from utils import *
+
+from .elect_primary import elect_primary
 
 blueprint = Blueprint('add', __name__)
 

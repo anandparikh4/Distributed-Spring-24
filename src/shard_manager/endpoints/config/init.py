@@ -1,10 +1,9 @@
 from quart import Blueprint, jsonify, request
 
-from endpoints.config import elect_primary
 from utils import *
-from elect_primary import elect_primary
 
 from .add import spawn_container
+from .elect_primary import elect_primary
 
 blueprint = Blueprint('init', __name__)
 

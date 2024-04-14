@@ -24,4 +24,4 @@ WORKDIR /app
 COPY --chmod=777 . .
 
 # Deploy the application
-CMD ["python", "shared_manager.py"]
+CMD ["python", "shard_manager.py"]
