@@ -48,7 +48,7 @@ async def delete():
         term = int(payload.get('term', -1))
         is_primary = str(payload.get('is_primary', 'false')).lower() == 'true'
         secondary_servers = list(payload.get('secondary_servers', []))
-        stud_id = int(payload.get('stud_id', ""))
+        stud_id = int(payload.get('stud_id', -1))
 
         # perform bookkeeping
         await bookkeeping(shard_id, term, "d")
@@ -56,6 +56,17 @@ async def delete():
         # insert log into LogT and update TermT
         async with common.pool.acquire() as conn:
             async with conn.transaction():
+
+                check = conn.transaction()
+                await check.start()
+                try:
+                    await conn.execute('''--sql
+                            DELETE FROM StudT
+                            WHERE stud_id = $1::INTEGER
+                        ''', stud_id)
+                finally:
+                    await check.rollback()
+
                 # add unexecuted term to TermT
                 await conn.execute('''--sql
                     UPDATE TermT
@@ -106,8 +117,4 @@ async def delete():
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:
-        print(f'{Fore.RED}ERROR | '
-              f'Error in data_write: {e}'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400

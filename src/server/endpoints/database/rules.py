@@ -83,12 +83,15 @@ async def bookkeeping(
                             SET stud_name = $3::TEXT , stud_marks = $4::INTEGER
                             WHERE shard_id = $1::TEXT
                             AND stud_id = $2::INTEGER
-                        ''', shard_id, stud_id, str(content[stud_id][0]), int(content[stud_id][1]))
+                        ''',
+                        shard_id, stud_id,
+                        str(content[str(stud_id)][0]),
+                        int(content[str(stud_id)][1]))
                     # delete
                     elif (operation == "d"):
                         await conn.execute('''--sql
                             DELETE FROM StudT
-                            WHERE stud_id = $1
+                            WHERE stud_id = $1::INTEGER
                         ''', stud_id)
                     # read
                     else:   # operation == "r"

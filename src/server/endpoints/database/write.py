@@ -8,6 +8,7 @@ from .rules import bookkeeping
 
 blueprint = Blueprint('write', __name__)
 
+
 async def write_post_wrapper(
     session: aiohttp.ClientSession,
     server_name: str,
@@ -21,6 +22,7 @@ async def write_post_wrapper(
         await response.read()
 
     return response
+
 
 @blueprint.route('/write', methods=['POST'])
 async def write():
@@ -54,20 +56,42 @@ async def write():
         secondary_servers = list(payload.get('secondary_servers', []))
         content = {}
         for _data in data:
-            content[str(_data["stud_id"])] = [str(_data["stud_name"]),int(_data["stud_marks"])]
+            content[str(_data["stud_id"])] = [
+                str(_data["stud_name"]), int(_data["stud_marks"])]
 
         # perform bookkeeping
-        await bookkeeping(shard_id,term,"w")
+        await bookkeeping(shard_id, term, "w")
 
         # insert log into LogT and update TermT
         async with common.pool.acquire() as conn:
             async with conn.transaction():
+
+                check = conn.transaction()
+                await check.start()
+                try:
+                    stmt = await conn.prepare('''--sql
+                            INSERT INTO StudT (stud_id , stud_name , stud_marks , shard_id)
+                            VALUES ($1::INTEGER,
+                                    $2::TEXT,
+                                    $3::INTEGER,
+                                    $4::TEXT);
+                        ''')
+
+                    await stmt.executemany([(
+                        int(key),
+                        str(content[key][0]),
+                        int(content[key][1]),
+                        shard_id
+                    ) for key in content])
+                finally:
+                    await check.rollback()
+
                 # add unexecuted term to TermT
                 await conn.execute('''--sql
                     UPDATE TermT
                     SET last_idx = $2 , executed = FALSE
                     WHERE shard_id = $1
-                ''',shard_id,term)
+                ''', shard_id, term)
 
                 # add latest log to LogT
                 await conn.execute('''--sql
@@ -77,27 +101,27 @@ async def write():
                             $3::TEXT,
                             NULL,
                             $4::JSON);
-                    ''',term,shard_id,"w",json.dumps(content))
-                
+                    ''', term, shard_id, "w", json.dumps(content))
+
                 if is_primary:
                     timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
                     async with aiohttp.ClientSession(timeout=timeout) as session:
                         tasks = [asyncio.create_task(
-                                write_post_wrapper(
-                                    session=session,
-                                    server_name=server_name,
-                                    json_payload={
-                                        "shard": shard_id,
-                                        "term": term,
-                                        "data": data,
-                                        "is_primary": False
-                                    }
-                                )
-                            ) for server_name in secondary_servers]
+                            write_post_wrapper(
+                                session=session,
+                                server_name=server_name,
+                                json_payload={
+                                    "shard": shard_id,
+                                    "term": term,
+                                    "data": data,
+                                    "is_primary": False
+                                }
+                            )
+                        ) for server_name in secondary_servers]
 
                         serv_response = await asyncio.gather(*tasks, return_exceptions=True)
                         serv_response = [None if isinstance(r, BaseException)
-                                              else r for r in serv_response]
+                                         else r for r in serv_response]
 
                         # If not all replicas are updated, then return an error
                         for r in serv_response:
@@ -113,8 +137,4 @@ async def write():
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:
-        print(f'{Fore.RED}ERROR | '
-              f'Error in data_write: {e}'
-              f'{Style.RESET_ALL}',
-              file=sys.stderr)
         return jsonify(ic(err_payload(e))), 400

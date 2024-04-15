@@ -45,5 +45,4 @@ async def server_config():
         return jsonify(ic(response_payload)), 200
 
     except Exception as e:
-
         return jsonify(ic(err_payload(e))), 400
