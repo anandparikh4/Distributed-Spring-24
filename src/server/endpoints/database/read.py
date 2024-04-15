@@ -5,6 +5,7 @@ from .rules import bookkeeping
 
 blueprint = Blueprint('read', __name__)
 
+
 @blueprint.route('/read', methods=['GET'])
 async def read():
     """
@@ -35,7 +36,7 @@ async def read():
         id_high = int(stud_id.get('high', -1))
 
         # perform bookkeeping
-        await bookkeeping(shard_id,term,"r")
+        await bookkeeping(shard_id, term, "r")
 
         # get data from StudT
         response_payload = {'data': [], 'status': 'success'}
@@ -45,8 +46,8 @@ async def read():
                 async for record in conn.cursor('''--sql
                     SELECT stud_id, stud_name, stud_marks
                     FROM StudT
-                    WHERE shard_id = $1
-                    AND stud_id BETWEEN $2 AND $3;
+                    WHERE shard_id = $1::TEXT
+                    AND stud_id BETWEEN $2::INTEGER AND $3::INTEGER;
                 ''', shard_id, id_low, id_high):
 
                     response_payload['data'].append(dict(record))

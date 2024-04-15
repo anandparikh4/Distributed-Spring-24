@@ -16,7 +16,7 @@ services:
     tty: true
     environment:
       SERVER_ID: 0
-      # DEBUG: "true"
+      DEBUG: "true"
       POSTGRES_HOST: "localhost"
       POSTGRES_PORT: 5432
       POSTGRES_USER: "postgres"
@@ -41,7 +41,7 @@ services:
     hostname: Load-Balancer
     tty: true
     environment:
-      # DEBUG: "true"
+      DEBUG: "true"
       POSTGRES_HOST: "Database"
       POSTGRES_PORT: 5432
       POSTGRES_USER: "postgres"
@@ -65,7 +65,7 @@ services:
     tty: true
     environment:
       HASH_NUM: 1
-      # DEBUG: "true"
+      DEBUG: "true"
       POSTGRES_HOST: "Database"
       POSTGRES_PORT: 5432
       POSTGRES_USER: "postgres"

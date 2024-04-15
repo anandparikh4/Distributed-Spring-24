@@ -42,7 +42,7 @@ async def bookkeeping(
                     await conn.execute('''--sql
                         UPDATE TermT
                         SET executed = TRUE
-                        WHERE shard_id = $1::TEXT                   
+                        WHERE shard_id = $1::TEXT
                     ''', shard_id)
 
                     # get the log from LogT
@@ -55,9 +55,16 @@ async def bookkeeping(
 
                     if log_row is None:
                         raise Exception(f"Failed to perform bookkeeping")
+
+                    ic(dict(log_row))
+
                     operation = log_row["operation"]
-                    stud_id = log_row.get("stud_id", -1)
-                    content = log_row.get("content", "{}")
+                    stud_id = log_row.get("stud_id")
+                    if stud_id is None:
+                        stud_id = -1
+                    content = log_row.get("content")
+                    if content is None:
+                        content = "{}"
                     content = json.loads(content)
 
                     # do different things for different operations
@@ -78,15 +85,16 @@ async def bookkeeping(
                         ) for key in content])
                     # update
                     elif (operation == "u"):
-                        await conn.execute('''--sql
+                        await conn.execute(
+                            '''--sql
                             UPDATE StudT
                             SET stud_name = $3::TEXT , stud_marks = $4::INTEGER
                             WHERE shard_id = $1::TEXT
                             AND stud_id = $2::INTEGER
                         ''',
-                        shard_id, stud_id,
-                        str(content[str(stud_id)][0]),
-                        int(content[str(stud_id)][1]))
+                            shard_id, stud_id,
+                            str(content[str(stud_id)][0]),
+                            int(content[str(stud_id)][1]))
                     # delete
                     elif (operation == "d"):
                         await conn.execute('''--sql

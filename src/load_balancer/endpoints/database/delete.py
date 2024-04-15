@@ -124,8 +124,6 @@ async def delete():
                 if serv_response is None or serv_response.status != 200:
                     raise Exception('Failed to delete data entry')
 
-                ic(serv_response)
-
                 await conn.execute(
                     '''--sql
                     UPDATE
