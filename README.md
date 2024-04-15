@@ -103,5 +103,18 @@ For ensuring distributed database consistency, a Write-Ahead Logging (WAL) mecha
 5. **Synchronous Replication**: The primary waits for the majority replica to commit the data before committing its copy of data and acknowledging transactions, which ensures strong consistency. If the primary shard fails, then a new primary is chosen from the replicated shards having the most updated log entries. As soon as the downed database server is up, it copies all the shards from the primary shards. It ensures the system can be recovered from crash failure
 with consistent data.
 
-#### The Algorithm
-```text
+#### Protocol
+A server maintains three tables:
+1. `StudT(stud_id: INTEGER, stud_name: TEXT, stud_marks: INTEGER, shard_id: TEXT)`
+1. `TermT(shard_id: TEXT, last_idx: INTEGER, executed: BOOLEAN)`
+2. `logT(log_idx: INTEGER, shard_id: TEXT, operation: TEXT, stud_id: INTEGER, content: JSON)`
+
+The load balancer maintains a single table:
+1. `ShardT(stud_id_low: INTEGER, shard_id: TEXT, shard_size: INTEGER, valid_at: INTEGER)`
+
+A particular shard is stored in a number of servers. In this group, one server acts as the primary server and rest are secondary servers for that particular shard. Upon receiving a request the load balancer first queries the shard manager to find out primaries for the relevant shards. The load balancer sends the request to the primary server which forwards it to the secondary servers.
+
+Bookkeeping operations are performed by the servers upon receiving a request for a particular shard. The requests can be assumed to have a general form `(shard_id, term, op)`. Bookkeeping happens in the following fashion:
+1. The server consults its `logT` table to find all entries corresponding to `shard_id`.
+2. For entries where (`term` > `last_idx`) or (`term` == `last_idx` and `op` == 'R'), if the log entry is not executed, it is executed.
+3. For entries where (`term` < `last_idx`) or (`term` == `last_idx` and `op` != 'R'), the entry is removed from the log.
