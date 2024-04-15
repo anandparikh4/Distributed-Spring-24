@@ -92,80 +92,16 @@ Some design choices have been made during dockerizing the application. These are
 1. Multistage build have been used during dockerization. This is done to reduce the image sizes for the load balancer and the server as much as possible.
 1. Both the load balancer and server containers are deployed via a shell script `deploy.sh`. `postgres` is first run as a background task and the main process waits until it starts, using a variable `pg_isready`. When `postgres` is up and running, the main process runs the actual python file as a background task - `load_balancer.py` for load balancer and `server.py` for servers. Signal handlers are modified such that any `SIGTERM` or `SIGINT` signal to the main process is sent to the two child processes as well. The main process then waits for the two child processes.  
 
-### The Cat-Dat-Vat Algorithm
+### The Protocol
 
-#### Preliminaries
-
-For ensuring distributed database consistency, the Cat-Dat-Vat algorithm is used. The name is derived from three different indices used to ensure consistency - `created_at` (`cat`), `deleted_at` (`dat`) and `valid_at` (`vat`). A server maintains two tables:
-1. `StudT(stud_id: INTEGER, stud_name: TEXT, stud_marks: INTEGER, shard_id: TEXT, created_at: INTEGER, deleted_at: INTEGER)`
-1. `TermT(shard_id: TEXT, term: INTEGER)`
-
-The load balancer maintains a single table:
-1. `ShardT(stud_id_low: INTEGER, shard_id: TEXT, shard_size: INTEGER, valid_at: INTEGER)`
-
-For every shard, both the servers and the load balancer maintains a notion of time - `term` for servers and `valid_at` for the load balancer. Instead of running a distributed leader election algorithm, the load balancer is regarded as the leader and its `valid_at` value for a shard is assumed to be always correct. When a shard is created for the first time, it does not contain any rows and these values (`term`s and `valid_at`) are initialized with `0`. Inside a shard, a row maintains `created_at` which denotes when the row was created and `deleted_at` which denotes when it was or is to be deleted. The operations sent by the load balancer to the servers is either of or can be broken down into the following types of elementary operations:
-1. Create: `C(shard_id, stud_id, vat)`
-2. Read: `R(shard_id, stud_id, vat)`
-3. Update: `U(shard_id, stud_id, vat)`
-4. Delete: `D(shard_id, stud_id, vat)`
-
-The general operation can therefore be written as `O(shard_id, stud_id, vat)` where `O` can be `C`, `R`, `U` or `D`. In the description of the algorithm, lines starting with `LB` denotes that it is executed by the load balancer whereas those starting with `S` denotes that they are executed by the server. The `return` statement is essentially the statement `send response to client`. The actual requests and responses may contain additional payloads not relevant to the Cat-Dat-Vat algorithm. These payloads are therefore not mentioned in the description of the algorithm. In load balancer or servers, any set of database accesses are all performed within a single transaction, such that when failures occur, the changes are all rolled back and consistency is ensured. Locking of database rows is employed by `postgres`'s `SELECT ... FOR UPDATE` syntax.
+#### Write-Ahead Logging
+For ensuring distributed database consistency, a Write-Ahead Logging (WAL) mechanism is used. WAL works as follows:
+1. **Logging Changes Before Writing to Disk**: With WAL, any changes to the database are first recorded in a log file before they are applied to the database files on disk. This log file is stored in a durable storage medium (like SSDs, RAID-configured HDDs or SSDs, and cloud storage).
+2. **Sequential Writes**: The changes are written sequentially to the log, which is more efficient than random disk access, especially for large transactions or when multiple transactions are occurring simultaneously.
+3. **Recovery Process**: In the event of a crash or restart, the system reads the WAL file(s) to redo operations that were not fully committed to the database files, ensuring that no committed transactions are lost. It can also undo any changes from transactions that were not completed, maintaining data integrity.
+4. **Replication Log Shipping**: A primary database server is chosen for each shard when writing to that shard is going to happen. The primary database server writes changes to its WAL as part of normal operations. These WAL records can then be shipped to replica servers, where they are replayed to apply the same changes. This ensures that all replicas process the same set of changes in the same order, maintaining consistency across the system.
+5. **Synchronous Replication**: The primary waits for the majority replica to commit the data before committing its copy of data and acknowledging transactions, which ensures strong consistency. If the primary shard fails, then a new primary is chosen from the replicated shards having the most updated log entries. As soon as the downed database server is up, it copies all the shards from the primary shards. It ensures the system can be recovered from crash failure
+with consistent data.
 
 #### The Algorithm
 ```text
-Algorithm Cat-Dat-Vat(O, shard_id, stud_id, vat):
-    LB  |    
-    LB  |    servers <-- list of servers for the load balancer to send requests to
-    LB  |    max_vat <-- vat
-    LB  |    for server in servers:
-    S   |        delete entries where dat <= vat
-    S   |        delete entries where cat > vat
-    S   |        update dat to ∞ where dat > vat
-    S   |        if O == R:
-    S   |            response = {
-    S   |                "data": select entry corresponding to stud_id having cat <= vat
-    S   |            }
-    S   |            
-    S   |            send response to load balancer
-    LB  |            send response to client
-    LB  |            
-    S   |        else:
-    S   |            term <-- select term corresponding to shard_id
-    S   |            term <-- max(term, vat) + 1
-    S   |            
-    S   |            if O == C:
-    S   |                insert data with cat = term and dat = ∞
-    S   |                update term corresponding to shard_id
-    S   |                response = {
-    S   |                    "vat": term
-    S   |                }
-    S   |                
-    S   |                send response to load balancer        
-    LB  |                
-    S   |            else if O == D:
-    S   |                update dat to term corresponding to stud_id
-    S   |                update term corresponding to shard_id
-    S   |                response = {
-    S   |                    "vat": term
-    S   |                }
-    S   |                
-    S   |                send response to load balaner
-    LB  |                
-    S   |            else if O == U:
-    S   |                # `U` operation is essentially a `D` operation followed by a `C` operation 
-    S   |                update dat to term corresponding to stud_id
-    S   |                term += 1
-    S   |                insert data with cat = term and dat = ∞
-    S   |                update term corresponding to shard_id
-    S   |                response = {
-    S   |                    "vat": term
-    S   |                }
-    S   |                
-    S   |                send response to load balancer
-    LB  |                
-    LB  |            max_vat <-- max(max_vat, response["vat"])
-    LB  |
-    LB  |    update vat to max_vat corresponding to shard_id
-    LB  |
-    LB  |    send response to client
-```
