@@ -89,8 +89,8 @@ async def read():
             raise Exception('`low` cannot be greater than `high`')
 
         # Get the shard names and valid ats containing the entries
-        shard_ids: list[str] = []
-        shard_valid_ats: list[int] = []
+        shard_ids: List[str] = []
+        shard_valid_ats: List[int] = []
 
         async with common.pool.acquire() as conn:
             async with conn.transaction():
