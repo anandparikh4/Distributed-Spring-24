@@ -24,7 +24,9 @@ async def rep():
         async with aiohttp.ClientSession(timeout=timeout) as session:
             # Get the list of replicas
             async with session.get(f'http://Shard-Manager:5000/rep') as response:
-                return jsonify(ic(await response.json())), 200
+                return (await response.content.read(),
+                        response.status,
+                        dict(response.headers))
 
     except Exception as e:
         return jsonify(ic(err_payload(e))), 400

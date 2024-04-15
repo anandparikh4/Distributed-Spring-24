@@ -172,8 +172,6 @@ async def add():
                 await asyncio.gather(*tasks, return_exceptions=True)
             # END async with Docker
 
-            elect_primary()
-            ic(shard_primary)
             ic(serv_ids)
 
             await asyncio.sleep(0)
@@ -199,6 +197,9 @@ async def add():
                     shard_map[shard].add(hostname, serv_ids[hostname])
                 # END for shard in servers[hostname]
             # END for hostname in hostnames
+            
+            elect_primary()
+            ic(shard_primary)
 
             if len(new_shards) > 0:
                 async with common.pool.acquire() as conn:

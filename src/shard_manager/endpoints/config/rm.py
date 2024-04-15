@@ -78,59 +78,24 @@ async def rm():
             raise Exception(
                 'Number of servers to delete must be less than or equal to number of replicas')
 
-        if len(hostnames) > n:
+        hostnames_set = set(hostnames)
+
+        if len(hostnames_set) != len(hostnames):
+            raise Exception('Duplicate hostnames are not allowed in the list')
+
+        if len(hostnames) != n:
             raise Exception(
-                'Length of hostname list is more than instances to delete')
-
-        singles = {servers.getServerList()[0]: shard
-                   for shard, servers in shard_map.items()
-                   if len(servers) == 1}
-
-        ic(singles)
-
-        single_problems = {server: shard
-                           for server, shard in singles.items()
-                           if server in hostnames}
-
-        ic(single_problems)
-
-        if len(single_problems) > 0:
-            raise Exception(
-                f'Only one copy of shards `{list(single_problems.values())}` is '
-                f'present in the hostnames `{list(single_problems.keys())}` '
-                f'to delete, respectively.')
+                'Length of hostname list is not equal to no. of instances to delete')
 
         async with common.lock(Write):
-            choices = set(replicas.getServerList())
 
-            # Convert hostnames to set for faster lookup
-            hostnames_set = set(hostnames)
-
-            # Check if all `hostnames` are in `replicas`
-            if not hostnames_set.issubset(choices):
-                raise Exception(
-                    f'Hostnames `{hostnames_set - choices}` are not in replicas')
-
-            # remove `hostnames` from `choices`
-            choices = list(choices - hostnames_set - singles.keys())
-
-            ic(choices)
-
-            if (_k := len(choices) + len(hostnames)) < n:
-                raise Exception(
-                    f'Not enough replicas to delete. '
-                    f'Only {_k} replicas can be deleted.')
-
-            # Choose `n - len(hostnames)` random hostnames from the list without replacement
-            random_hostnames = random.sample(choices,
-                                             k=(n - len(hostnames)))
-
-            # Add the random hostnames to the list of hostnames to delete
-            hostnames.extend(random_hostnames)
+            for shard, servers in shard_map.items():
+                remaining = set(servers.getServerList()) - hostnames_set
+                if len(remaining) == 0:
+                    raise Exception(f'Cannot delete all servers. '
+                                    f'Shard `{shard}` will be left without any server.')
 
             ic("To delete: ", hostnames)
-
-            hostnames_set = set(hostnames)
 
             for shard, primary in shard_primary.items():
                 if primary in hostnames_set:

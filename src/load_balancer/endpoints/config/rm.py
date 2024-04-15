@@ -51,7 +51,9 @@ async def rm():
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.delete(f'http://Shard-Manager:5000/rm',
                                    json=await request.get_json()) as response:
-                return jsonify(ic(await response.json())), 200
+                return (await response.content.read(),
+                        response.status,
+                        dict(response.headers))
 
     except Exception as e:
         return jsonify(ic(err_payload(e))), 400
