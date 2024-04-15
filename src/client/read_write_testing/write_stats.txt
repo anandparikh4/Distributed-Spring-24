@@ -1,10 +1,10 @@
 Machine 1
 
-A1 - Time taken: 548.40 seconds
-A2 - Time taken: 1107.88 seconds
-A3 - Time taken: 1021.17 seconds
+A1 - Time taken: 1577.40 seconds
+A2 - Time taken: 4020.94 seconds
+A3 - Time taken: 3251.08 seconds
 
 Machine 2
-A1 - Time taken: 576.48 seconds
-A2 - Time taken: 1140.94 seconds
-A3 - Time taken: 1124.97 seconds
+A1 - Time taken: 2234.44 seconds
+A2 - Time taken: 2838.72 seconds
+A3 - Time taken: 3427.10 seconds
