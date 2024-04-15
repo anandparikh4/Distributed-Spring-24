@@ -1,4 +1,3 @@
-aiodocker
 aiohttp[speedups]
 asyncpg
 asyncpg-stubs

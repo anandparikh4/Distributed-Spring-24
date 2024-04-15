@@ -1,7 +1,6 @@
 from quart import Quart
 
 from endpoints import blueprint as all_blueprints
-from heartbeat_flatline import get_heartbeats
 from utils import *
 
 app = Quart(__name__)
@@ -18,9 +17,6 @@ async def my_startup():
     try:
         # Register the blueprints
         app.register_blueprint(all_blueprints)
-
-        # Register the heartbeat background task
-        app.add_background_task(get_heartbeats)
 
         common.pool = asyncpg.create_pool(
             user=DB_USER,
@@ -63,55 +59,6 @@ async def my_shutdown():
     1. Stop the heartbeat background task.
     2. Stop all server replicas.
     """
-
-    global replicas
-
-    # Stop the heartbeat background task
-    app.background_tasks.pop().cancel()
-
-    # Stop all server replicas
-    semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-    async def stop_and_delete_container(
-        docker: Docker,
-        server_name: str
-    ):
-        # Allow other tasks to run
-        await asyncio.sleep(0)
-
-        try:
-            async with semaphore:
-                container = await docker.containers.get(server_name)
-
-                await container.kill(signal='SIGTERM')
-                await container.wait()
-                await container.delete(force=True)
-
-                if DEBUG:
-                    print(f'{Fore.LIGHTYELLOW_EX}REMOVE | '
-                          f'Deleted container for {server_name}'
-                          f'{Style.RESET_ALL}',
-                          file=sys.stderr)
-            # END async with semaphore
-        except Exception as e:
-            if DEBUG:
-                print(f'{Fore.RED}ERROR | '
-                      f'{e.__class__.__name__}: {e}'
-                      f'{Style.RESET_ALL}',
-                      file=sys.stderr)
-        # END try-except
-    # END stop_and_delete_container
-
-    async with Docker() as docker:
-        tasks = [asyncio.create_task(
-            stop_and_delete_container(
-                docker,
-                server_name
-            )
-        ) for server_name in replicas.getServerList()]
-
-        await asyncio.gather(*tasks, return_exceptions=True)
-    # END async with Docker
 
     # close the pool
     await common.pool.close()

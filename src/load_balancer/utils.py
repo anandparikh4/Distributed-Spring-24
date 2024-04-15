@@ -16,15 +16,6 @@ class Write(asyncio.Future):
 # END class Write
 
 
-def random_hostname():
-    """
-    Generate a random hostname.
-    """
-
-    return f'Server-{random.randrange(0, 1000):03}-{int(time.time()*1e3) % 1000:03}'
-# END random_hostname
-
-
 def err_payload(err: Exception):
     """
     Generate an error payload.
@@ -41,49 +32,6 @@ def err_payload(err: Exception):
         'status': 'failure'
     }
 # END err_payload
-
-
-def get_container_config(
-    serv_id: int,
-    hostname: str
-):
-    """
-    Get the container config for the server replica.
-    """
-
-    return {
-        'image': 'server:v2',
-        'detach': True,
-        'env': [
-            f'SERVER_ID={serv_id:06}',
-            f'DEBUG={str(DEBUG).lower()}',
-            'POSTGRES_HOST=localhost',
-            'POSTGRES_PORT=5432',
-            'POSTGRES_USER=postgres',
-            'POSTGRES_PASSWORD=postgres',
-            'POSTGRES_DB_NAME=postgres',
-        ],
-        'hostname': hostname,
-        'tty': True,
-    }
-
-
-def get_new_server_id():
-    """
-    Get a new server id.
-    """
-
-    global serv_ids
-
-    # generate new 6-digit id not in `serv_ids`
-    new_id = get_request_id()
-
-    while new_id in serv_ids.values():
-        new_id = get_request_id()
-    # END while
-
-    return new_id
-# END get_new_server_id
 
 
 def get_request_id():

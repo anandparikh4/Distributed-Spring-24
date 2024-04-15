@@ -1,5 +1,6 @@
 For A-1
 
+Payload json:
 {
     "N": 6,
     "shards": [
@@ -52,9 +53,27 @@ For A-1
     }
 }
 
+Response json:
+{
+    "message": {
+        "N": 6,
+        "replicas": [
+            "server0",
+            "server1",
+            "server3",
+            "server4",
+            "server5",
+            "server6"
+        ]
+    },
+    "status": "success"
+}
+
+--------------------------------------------------------------------------------------
 
 For A-2
 
+Payload json:
 {
     "N": 10,
     "shards": [
@@ -133,9 +152,31 @@ For A-2
     }
 }
 
+Response json:
+{
+    "message": {
+        "N": 10,
+        "replicas": [
+            "server0",
+            "server1",
+            "server2",
+            "server3",
+            "server4",
+            "server5",
+            "server6",
+            "server7",
+            "server8",
+            "server9"
+        ]
+    },
+    "status": "success"
+}
+
+-------------------------------------------------------------------------------------------
 
 For A-3
 
+Payload json:
 {
     "N": 10,
     "shards": [
@@ -240,4 +281,24 @@ For A-3
             "sh6"
         ]
     }
+}
+
+Response json:
+{
+    "message": {
+        "N": 10,
+        "replicas": [
+            "server0",
+            "server1",
+            "server2",
+            "server3",
+            "server4",
+            "server5",
+            "server6",
+            "server7",
+            "server8",
+            "server9"
+        ]
+    },
+    "status": "success"
 }

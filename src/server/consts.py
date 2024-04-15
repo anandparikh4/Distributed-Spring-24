@@ -13,3 +13,6 @@ DB_PORT = int(os.environ.get('POSTGRES_PORT', 5432))
 DB_USER = os.environ.get('POSTGRES_USER', 'postgres')
 DB_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'postgres')
 DB_NAME = os.environ.get('POSTGRES_DB_NAME', 'postgres')
+
+# Primary to Secondary request timeout
+REQUEST_TIMEOUT = 1

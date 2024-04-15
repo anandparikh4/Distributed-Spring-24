@@ -2,7 +2,7 @@ import csv
 import random
 from typing import List
 
-from attr import dataclass
+from dataclasses import dataclass
 
 fnames: List[str] = []
 lnames: List[str] = []

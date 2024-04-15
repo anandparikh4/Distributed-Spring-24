@@ -17,17 +17,17 @@ async def rep():
         `status: status of the request`
     """
 
-    global replicas
+    await asyncio.sleep(0)
 
-    async with common.lock(Read):
+    try:
+        timeout = aiohttp.ClientTimeout(connect=REQUEST_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Get the list of replicas
+            async with session.get(f'http://Shard-Manager:5000/rep') as response:
+                return (await response.content.read(),
+                        response.status,
+                        dict(response.headers))
 
-        # Return the response payload
-        return jsonify(ic({
-            'message': {
-                'N': len(replicas),
-                'replicas': replicas.getServerList(),
-            },
-            'status': 'successful',
-        })), 200
-    # END async with lock
+    except Exception as e:
+        return jsonify(ic(err_payload(e))), 400
 # END rep
