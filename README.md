@@ -29,20 +29,20 @@ For A1-A3, the read times and write times are checked on two different machines.
 ### A1
 |           | Read Time (in s) | Write Time (in s) |
 |-----------|------------------|-------------------|
-| Machine 1 | 366.13           | 548.40            |
-| Machine 2 | 196.46           | 576.48            |
+| Machine 1 | 433.89           | 1577.40            |
+| Machine 2 | 309.94           | 2234.44            |
 
 ### A2
 |           | Read Time (in s) | Write Time (in s) |
 |-----------|------------------|-------------------|
-| Machine 1 | 368.24           | 1107.88            |
-| Machine 2 | 200.48           | 1140.94            |
+| Machine 1 | 437.80           | 4020.94            |
+| Machine 2 | 274.79           | 2838.72            |
 
 ### A3
 |           | Read Time (in s) | Write Time (in s) |
 |-----------|------------------|-------------------|
-| Machine 1 | 373.65           | 1021.17            |
-| Machine 2 | 188.34           | 1124.97            |
+| Machine 1 | 425.43           | 3251.08            |
+| Machine 2 | 287.27           | 3247.10            |
 
 ### A4
 The prerequisites and sample request-reponse pairs for the endpoints can be found inside [endpoint_testing](./src/client/endpoint_testing).
