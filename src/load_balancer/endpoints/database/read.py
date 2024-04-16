@@ -104,6 +104,8 @@ async def read():
                     WHERE
                         (stud_id_low <= ($2::INTEGER)) AND
                         (($1::INTEGER) < stud_id_low + shard_size)
+                    ORDER BY
+                        shard_id
                     FOR SHARE;
                     ''',
                         low, high):
