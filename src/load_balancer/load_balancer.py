@@ -60,14 +60,10 @@ async def my_shutdown():
     """
     Shutdown function to be run after the app stops.
 
-    1. Stop the heartbeat background task.
-    2. Stop all server replicas.
+    1. Stop all server replicas.
     """
 
     global replicas
-
-    # Stop the heartbeat background task
-    app.background_tasks.pop().cancel()
 
     # Stop all server replicas
     semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
