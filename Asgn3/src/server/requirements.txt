@@ -1,0 +1,6 @@
+aiohttp[speedups]
+asyncpg
+asyncpg-stubs
+colorama
+icecream
+Quart

@@ -1,0 +1,11 @@
+Machine 1
+
+A1 - Time taken: 433.89 seconds
+A2 - Time taken: 437.80 seconds
+A3 - Time taken: 425.43 seconds
+
+Machine 2
+
+A1 - Time taken: 309.94 seconds
+A2 - Time taken: 274.79 seconds
+A3 - Time taken: 287.27 seconds

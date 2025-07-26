@@ -1,0 +1,95 @@
+name: distributed_systems_2
+
+services:
+  Dummy-Server:
+    build: ./server
+    image: server:v3
+    container_name: Dummy-Server
+    depends_on:
+      - Load-Balancer
+      - Shard-Manager
+    networks:
+      my_net:
+        aliases:
+          - Dummy-Server
+    hostname: Dummy-Server
+    tty: true
+    environment:
+      SERVER_ID: 0
+      # DEBUG: "true"
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
+
+  Load-Balancer:
+    build: ./load_balancer
+    image: load:v3
+    container_name: Load-Balancer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    depends_on:
+      - Database
+    ports:
+      - "5000:5000"
+    networks:
+      my_net:
+        aliases:
+          - Load-Balancer
+    hostname: Load-Balancer
+    tty: true
+    environment:
+      # DEBUG: "true"
+      POSTGRES_HOST: "Database"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
+
+  Shard-Manager:
+    build: ./shard_manager
+    image: shard:v3
+    container_name: Shard-Manager
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    depends_on:
+      - Database
+    networks:
+      my_net:
+        aliases:
+          - Shard-Manager
+    hostname: Shard-Manager
+    tty: true
+    environment:
+      HASH_NUM: 1
+      # DEBUG: "true"
+      POSTGRES_HOST: "Database"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
+
+  Database:
+    build: ./database
+    image: database:v3
+    container_name: Database
+    networks:
+      my_net:
+        aliases:
+          - Database
+    hostname: Database
+    tty: true
+    environment:
+      POSTGRES_HOST: "localhost"
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB_NAME: "postgres"
+
+# define a network my_net
+networks:
+  my_net:
+    name: my_net
