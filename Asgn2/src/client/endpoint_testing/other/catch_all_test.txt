@@ -1,0 +1,13 @@
+..... ....
+
+1. success
+
+GET /yolo
+
+Payload Json = EMPTY
+
+Response Json =
+{
+    "message": "<Error> `/yolo` endpoint does not exist in server replicas",
+    "status": "failure"
+}

@@ -1,0 +1,213 @@
+POST /init
+
+1. Empty Payload
+
+Payload Json  = EMPTY
+
+Response Json = 
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. Payload does not have 'N', 'servers' or len(servers) != N
+
+Payload Json = {}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Length of server list is not equal to instances to add",
+    "status": "failure"
+}
+
+3. Shard description is invalid
+
+Payload Json = 
+{
+    "N": 6,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 8192,
+            "shard_id": "sh3",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 12288,
+            "shard_id": "sh4",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1",
+            "sh2"
+        ],
+        "Server1": [
+            "sh3",
+            "sh4"
+        ],
+        "Server3": [
+            "sh1",
+            "sh3"
+        ],
+        "Server4": [
+            "sh4",
+            "sh2"
+        ],
+        "Server5": [
+            "sh1",
+            "sh4"
+        ],
+        "Server6": [
+            "sh3",
+            "sh2"
+        ]
+    }
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Invalid shard description",
+    "status": "failure"
+}
+
+4. New shards are not defined
+
+Payload Json = 
+{
+    "N": 6,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_id": "sh2",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 8192,
+            "shard_id": "sh3",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 12288,
+            "shard_id": "sh4",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1",
+            "sh10"
+        ],
+        "Server1": [
+            "sh3",
+            "sh42"
+        ],
+        "Server3": [
+            "sh1",
+            "sh3"
+        ],
+        "Server4": [
+            "sh4",
+            "sh2"
+        ],
+        "Server5": [
+            "sh1",
+            "sh4"
+        ],
+        "Server6": [
+            "sh3",
+            "sh2"
+        ]
+    }
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Shards `{'sh42', 'sh10'}` are not defined in new_shards",
+    "status": "failure"
+}
+
+5. Success
+
+Payload Json =
+{
+    "N": 6,
+    "shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 4096,
+            "shard_id": "sh2",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 8192,
+            "shard_id": "sh3",
+            "shard_size": 4096
+        },
+        {
+            "stud_id_low": 12288,
+            "shard_id": "sh4",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1",
+            "sh2"
+        ],
+        "Server1": [
+            "sh3",
+            "sh4"
+        ],
+        "Server3": [
+            "sh1",
+            "sh3"
+        ],
+        "Server4": [
+            "sh4",
+            "sh2"
+        ],
+        "Server5": [
+            "sh1",
+            "sh4"
+        ],
+        "Server6": [
+            "sh3",
+            "sh2"
+        ]
+    }
+}
+
+Response Json = 
+{
+    "message": {
+        "N": 6,
+        "replicas": [
+            "Server0",
+            "Server1",
+            "Server3",
+            "Server4",
+            "Server5",
+            "Server6"
+        ]
+    },
+    "status": "success"
+}

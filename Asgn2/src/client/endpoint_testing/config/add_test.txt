@@ -1,0 +1,144 @@
+POST /add
+
+1. Empty Payload
+
+Payload Json = EMPTY
+
+Response Json = 
+{
+    "message": "<Error> Exception: Payload is empty",
+    "status": "failure"
+}
+
+2. Payload does not have 'N', 'servers' or len(servers) != N
+
+Payload Json = {}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Length of server list is not equal to instances to add",
+    "status": "failure"
+}
+
+3. Shard description is invalid
+
+Payload Json = 
+{
+    "N": 2,
+    "new_shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1"
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ],
+        "Server1": [
+            "sh1"
+        ]
+    }
+}
+
+Response Json = 
+{
+    "message": "<Error> Exception: Invalid shard description",
+    "status": "failure"
+}
+
+4. Server names are already present
+
+Prerequisite = Default configuration via POST at /init
+
+Payload Json = 
+{
+    "N": 1,
+    "servers": {
+        "Server0": [
+            "sh2"
+        ]
+    }
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Hostnames `{'Server0'}` are already in replicas",
+    "status": "failure"
+}
+
+5. New shard(s) are already present in the shard map
+
+Prerequisite = Default configuration via POST at /init
+
+Payload Json =
+{
+    "N": 1,
+    "new_shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server10": [
+            "sh1"
+        ]
+    }
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Shards `{'sh1'}` are already in shard_map",
+    "status": "failure"
+}
+
+6. New shard(s) are not defined
+
+Payload Json =
+{
+    "N": 1,
+    "new_shards": [],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ]
+    }
+}
+
+Response Json =
+{
+    "message": "<Error> Exception: Shards `{'sh1'}` are not defined in shard_map or new_shards",
+    "status": "failure"
+}
+
+7. Success
+
+Payload Json =
+{
+    "N": 1,
+    "new_shards": [
+        {
+            "stud_id_low": 0,
+            "shard_id": "sh1",
+            "shard_size": 4096
+        }
+    ],
+    "servers": {
+        "Server0": [
+            "sh1"
+        ]
+    }
+}
+
+Response Json =
+{
+    "message": {
+        "N": 1,
+        "replicas": [
+            "Server0"
+        ]
+    },
+    "status": "success"
+}
